@@ -9,6 +9,7 @@
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/business.test.js",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
