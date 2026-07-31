@@ -1,11 +1,15 @@
 import './styles.css';
 import { ITEM_SLOTS, type AppConfig, type SessionState } from './types';
 
-const appElement = document.querySelector<HTMLDivElement>('#app');
-
-if (!appElement) {
-  throw new Error('#app element not found.');
+function getAppElement(): HTMLDivElement {
+  const element = document.querySelector<HTMLDivElement>('#app');
+  if (!element) {
+    throw new Error('#app element not found.');
+  }
+  return element;
 }
+
+const appElement = getAppElement();
 
 let config: AppConfig;
 let session: SessionState;
