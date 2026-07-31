@@ -34,6 +34,8 @@ them, and exports a snapshot that is easy to analyze in Obsidian and Codex.
 - No telemetry.
 - Error messages in English in the user interface.
 - Code identifiers in English.
+- Commit messages must contain exactly one line.
+- Commit messages must follow the Conventional Commits specification.
 
 ## Definition of Done
 
