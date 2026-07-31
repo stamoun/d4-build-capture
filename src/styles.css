@@ -1,0 +1,143 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0b0b0d;
+  color: #f4f1ea;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 720px;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+h1 { margin: 0; font-size: 40px; }
+
+header p { color: #aaa49a; }
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: .2em;
+  color: #c68b4a;
+}
+
+.badge {
+  padding: 10px 14px;
+  border: 1px solid #3b3731;
+  border-radius: 999px;
+  background: #171719;
+}
+
+.panel {
+  padding: 20px;
+  background: #151517;
+  border: 1px solid #29272a;
+  border-radius: 14px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: #bbb4a9;
+}
+
+.wide { grid-column: 1 / -1; }
+
+.inline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+input, button {
+  min-height: 42px;
+  border-radius: 9px;
+  border: 1px solid #343137;
+  font: inherit;
+}
+
+input {
+  padding: 0 12px;
+  color: #fff;
+  background: #0d0d0f;
+}
+
+button {
+  padding: 0 15px;
+  color: #f5f2eb;
+  background: #242126;
+  cursor: pointer;
+}
+
+button:hover { border-color: #77644d; }
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-start;
+  min-height: 62px;
+  text-transform: capitalize;
+}
+
+.slot span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #111114;
+}
+
+.slot.done {
+  border-color: #92713f;
+  background: #2a2118;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.primary {
+  background: #8f2b20;
+  border-color: #b54536;
+}
+
+.secondary { margin-right: auto; }
+
+footer {
+  margin-top: 20px;
+  color: #746f68;
+  font-size: 12px;
+}
