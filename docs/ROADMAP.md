@@ -29,13 +29,28 @@
 
 ## 0.2 Guided Capture
 
+- [ ] Class specialization capture
+- [ ] Assigned skills capture
+- [ ] Talisman data capture
+- [ ] Skill tree capture
+- [ ] Paragon board capture
 - [ ] Visual region selector
 - [ ] Countdown before capture
 - [ ] Discreet notification after capture
 - [x] Shortcut reassignment
 - [ ] Multi-monitor support
 
-## 0.3 Analysis
+## 0.3 Visual Build Overview
+
+- [ ] Planner-style character overview inspired by Maxroll
+- [ ] Visual equipment layout with class-dependent weapon slots
+- [ ] Visual class specialization section
+- [ ] Visual assigned-skills section
+- [ ] Visual talisman section
+- [ ] Visual character-stats section
+- [ ] Use captured images only; do not infer or extract build data
+
+## 0.4 Analysis
 
 - [ ] Optional OCR
 - [ ] Manual field correction
