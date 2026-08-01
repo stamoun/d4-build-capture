@@ -1,0 +1,71 @@
+name: Build Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v0.1.0
+        required: true
+        type: string
+      release_name:
+        description: Optional release title
+        required: false
+        type: string
+      prerelease:
+        description: Mark the draft as a prerelease
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Build Windows installer
+        run: npm run make
+
+      - name: Create draft release with generated notes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          $installer = Get-ChildItem -Path 'out/make/squirrel.windows/x64' -Filter '*.exe' | Select-Object -First 1
+          if (-not $installer) {
+            throw 'The Windows installer was not generated.'
+          }
+
+          $title = if ($env:RELEASE_NAME) { $env:RELEASE_NAME } else { $env:RELEASE_TAG }
+          $arguments = @(
+            'release', 'create', $env:RELEASE_TAG, $installer.FullName,
+            '--draft', '--generate-notes', '--title', $title,
+            '--target', $env:GITHUB_SHA
+          )
+          if ($env:IS_PRERELEASE -eq 'true') {
+            $arguments += '--prerelease'
+          }
+
+          & gh @arguments

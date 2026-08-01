@@ -43,6 +43,12 @@ header p { color: #aaa49a; }
   background: #171719;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .panel {
   padding: 20px;
   background: #151517;
@@ -71,17 +77,31 @@ label {
   gap: 10px;
 }
 
-input, button {
+input, select, button {
   min-height: 42px;
   border-radius: 9px;
   border: 1px solid #343137;
   font: inherit;
 }
 
-input {
+input, select {
   padding: 0 12px;
   color: #fff;
   background: #0d0d0f;
+}
+
+input:disabled {
+  color: #6e6962;
+  background: #111113;
+  cursor: not-allowed;
+}
+
+select { padding: 0 12px; }
+
+.icon-button {
+  width: 42px;
+  padding: 0;
+  font-size: 22px;
 }
 
 button {
@@ -140,4 +160,67 @@ footer {
   margin-top: 20px;
   color: #746f68;
   font-size: 12px;
+}
+
+dialog {
+  width: min(620px, calc(100vw - 48px));
+  padding: 0;
+  color: #f4f1ea;
+  background: #151517;
+  border: 1px solid #3b3731;
+  border-radius: 14px;
+  box-shadow: 0 20px 80px #000c;
+}
+
+dialog::backdrop { background: #000a; }
+
+dialog form { padding: 24px; }
+
+.dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+h2 { margin: 0; font-size: 28px; }
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  color: #f4f1ea;
+}
+
+.checkbox-label input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: #b54536;
+}
+
+#shortcut { cursor: pointer; }
+
+#shortcut:focus {
+  border-color: #c68b4a;
+  box-shadow: 0 0 0 3px #c68b4a22;
+  outline: none;
+}
+
+small {
+  color: #746f68;
+  line-height: 1.4;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
 }

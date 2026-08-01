@@ -4,10 +4,16 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import sharp from 'sharp';
-import { createCollage } from '../src/collage';
 import { exportSession } from '../src/exporter';
 import { findNextUncapturedSlot } from '../src/session';
-import { ITEM_SLOTS, type AppConfig, type CaptureRecord, type SessionState } from '../src/types';
+import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
+import {
+  getItemSlots,
+  ITEM_SLOTS,
+  type AppConfig,
+  type CaptureRecord,
+  type SessionState
+} from '../src/types';
 
 async function createTemporaryDirectory(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'diablo-build-capture-test-'));
@@ -28,25 +34,8 @@ async function createCapture(
     }
   }).png().toFile(filePath);
 
-  return {
-    slot,
-    filePath,
-    capturedAt: '2026-07-31T12:00:00.000Z'
-  };
+  return { slot, filePath, capturedAt: '2026-07-31T12:00:00.000Z' };
 }
-
-test('createCollage rejects an empty capture set', async () => {
-  const directory = await createTemporaryDirectory();
-
-  try {
-    await assert.rejects(
-      createCollage({}, path.join(directory, 'build.png')),
-      new Error('No captures are available.')
-    );
-  } finally {
-    await fs.rm(directory, { recursive: true, force: true });
-  }
-});
 
 test('findNextUncapturedSlot advances without overwriting captures', () => {
   const helmet: CaptureRecord = {
@@ -64,55 +53,79 @@ test('findNextUncapturedSlot advances without overwriting captures', () => {
   assert.equal(findNextUncapturedSlot(allCaptures), null);
 });
 
-test('createCollage generates the expected fixed-grid PNG', async () => {
-  const directory = await createTemporaryDirectory();
+test('weapon slots depend on the selected class', () => {
+  const barbarianSlots = getItemSlots('Barbarian');
+  const druidSlots = getItemSlots('Druid');
 
-  try {
-    const helmet = await createCapture(directory, 'helmet', '#ff0000');
-    const chest = await createCapture(directory, 'chest', '#00ff00');
-    const outputPath = path.join(directory, 'build.png');
+  assert.equal(barbarianSlots.length, 16);
+  assert.equal(druidSlots.length, 14);
+  assert.equal(druidSlots.includes('weapon-3'), false);
+  assert.equal(druidSlots.includes('weapon-4'), false);
 
-    await createCollage({ helmet, chest }, outputPath);
-
-    const metadata = await sharp(outputPath).metadata();
-    assert.equal(metadata.format, 'png');
-    assert.equal(metadata.width, 1956);
-    assert.equal(metadata.height, 1028);
-  } finally {
-    await fs.rm(directory, { recursive: true, force: true });
-  }
+  const captures = Object.fromEntries(
+    druidSlots.slice(0, 10).map((slot) => [slot, {
+      slot,
+      filePath: `${slot}.png`,
+      capturedAt: '2026-07-31T12:00:00.000Z'
+    }])
+  ) as SessionState['captures'];
+  assert.equal(findNextUncapturedSlot(captures, druidSlots), 'stats-1');
 });
 
-test('exportSession writes a complete Obsidian snapshot', async () => {
+test('shortcut labels stay compact and convert to Electron accelerators', () => {
+  assert.equal(normalizeShortcutLabel('CommandOrControl+Shift+Space'), 'ctrl-shift-space');
+  assert.equal(buildShortcutLabel(new Set(['ctrl', 'shift']), ' '), 'ctrl-shift-space');
+  assert.equal(toElectronAccelerator('ctrl-alt-k'), 'CommandOrControl+Alt+K');
+  assert.equal(buildShortcutLabel(new Set(['ctrl']), 'Control'), null);
+});
+
+test('exportSession writes stats overview and filters inactive class slots', async () => {
   const directory = await createTemporaryDirectory();
 
   try {
     const helmet = await createCapture(directory, 'helmet', '#ff0000');
+    const stats1 = await createCapture(directory, 'stats-1', '#00ff00');
+    const weapon3 = await createCapture(directory, 'weapon-3', '#0000ff');
     const config: AppConfig = {
-      vaultPath: path.join(directory, 'vault'),
-      buildFolder: 'Diablo 4/Builds',
+      outputDirectory: path.join(directory, 'builds'),
       characterClass: 'Sorcerer',
       buildName: 'Frozen: Orb',
-      captureRegion: { x: 0, y: 0, width: 100, height: 150 }
+      buildUrl: 'https://example.com/frozen-orb',
+      captureRegion: { x: 0, y: 0, width: 100, height: 150 },
+      captureFullScreen: false,
+      shortcut: 'ctrl-shift-space'
     };
     const session: SessionState = {
       id: 'test-session',
-      captures: { helmet }
+      captures: { helmet, 'stats-1': stats1, 'weapon-3': weapon3 }
     };
 
     const outputDirectory = await exportSession(config, session);
+    assert.match(path.basename(outputDirectory), /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
     const markdown = await fs.readFile(path.join(outputDirectory, 'build.md'), 'utf8');
     const manifest = JSON.parse(
       await fs.readFile(path.join(outputDirectory, 'build.json'), 'utf8')
-    ) as { characterClass: string; buildName: string };
+    ) as {
+      characterClass: string;
+      buildName: string;
+      buildUrl: string;
+      captures: SessionState['captures'];
+    };
 
     assert.equal(path.basename(path.dirname(outputDirectory)), 'Sorcerer - Frozen- Orb');
     assert.match(markdown, /# Sorcerer · Frozen: Orb/);
-    assert.match(markdown, /- helmet: !\[\[items\/helmet\.png\]\]/);
+    assert.match(markdown, /planner: "https:\/\/example\.com\/frozen-orb"/);
+    assert.match(markdown, /## Character Stats Overview/);
+    assert.match(markdown, /!\[stats-1\]\(items\/stats-1\.png\)/);
+    assert.match(markdown, /- helmet: !\[helmet\]\(items\/helmet\.png\)/);
+    assert.doesNotMatch(markdown, /weapon-3/);
     assert.equal(manifest.characterClass, 'Sorcerer');
     assert.equal(manifest.buildName, 'Frozen: Orb');
-    await fs.access(path.join(outputDirectory, 'build.png'));
+    assert.equal(manifest.buildUrl, 'https://example.com/frozen-orb');
+    assert.equal(manifest.captures['weapon-3'], undefined);
+    await assert.rejects(fs.access(path.join(outputDirectory, 'build.png')));
     await fs.access(path.join(outputDirectory, 'items', 'helmet.png'));
+    await fs.access(path.join(outputDirectory, 'items', 'stats-1.png'));
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

@@ -3,7 +3,7 @@
 ## Mission
 
 Build a local Windows tool that manually captures Diablo IV tooltips, assembles
-them, and exports a snapshot that is easy to analyze in Obsidian and Codex.
+them, and exports a portable snapshot that is easy to analyze in Markdown tools and Codex.
 
 ## Principles
 
@@ -20,7 +20,6 @@ them, and exports a snapshot that is easy to analyze in Obsidian and Codex.
 - `src/preload.ts`: minimal API exposed to the renderer.
 - `src/renderer.ts`: user interface without Node access.
 - `src/capture.ts`: screen capture and cropping.
-- `src/collage.ts`: creation of `build.png`.
 - `src/exporter.ts`: Markdown, JSON, and image export.
 - `src/config.ts`: configuration validation and persistence.
 
@@ -34,7 +33,6 @@ them, and exports a snapshot that is easy to analyze in Obsidian and Codex.
 - No telemetry.
 - Error messages in English in the user interface.
 - Code identifiers in English.
-- Commit messages must contain exactly one line.
 - Commit messages must follow the Conventional Commits specification.
 
 ## Definition of Done

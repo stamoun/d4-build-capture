@@ -1,7 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { AppConfig, SessionState } from './types';
-import { createCollage } from './collage';
+import {
+  getItemSlots,
+  type AppConfig,
+  type CaptureRecord,
+  type ItemSlot,
+  type SessionState
+} from './types';
 
 function safeName(value: string): string {
   return value
@@ -11,53 +16,85 @@ function safeName(value: string): string {
 }
 
 function timestamp(date = new Date()): string {
-  return date.toISOString().replace(/[:.]/g, '-');
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return [
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`
+  ].join('_');
 }
 
-export async function exportSession(
+function captureImage(capture: CaptureRecord | undefined): string {
+  if (!capture) return '_Not captured_';
+  return `![${capture.slot}](items/${path.basename(capture.filePath)})`;
+}
+
+function yamlValue(value: string): string {
+  return JSON.stringify(value);
+}
+
+function statsOverview(captures: Partial<Record<ItemSlot, CaptureRecord>>): string {
+  return `| Stats 1 | Stats 2 |
+|---|---|
+| ${captureImage(captures['stats-1'])} | ${captureImage(captures['stats-2'])} |
+
+| Stats 3 | Stats 4 |
+|---|---|
+| ${captureImage(captures['stats-3'])} | ${captureImage(captures['stats-4'])} |`;
+}
+
+function activeCaptures(
   config: AppConfig,
   session: SessionState
-): Promise<string> {
-  if (!config.vaultPath) {
-    throw new Error('Configure the Obsidian vault path.');
-  }
+): Partial<Record<ItemSlot, CaptureRecord>> {
+  return Object.fromEntries(
+    getItemSlots(config.characterClass)
+      .map((slot) => [slot, session.captures[slot]] as const)
+      .filter((entry): entry is readonly [ItemSlot, CaptureRecord] => Boolean(entry[1]))
+  ) as Partial<Record<ItemSlot, CaptureRecord>>;
+}
 
-  const snapshotName = timestamp();
+export async function exportSession(config: AppConfig, session: SessionState): Promise<string> {
+  if (!config.outputDirectory) throw new Error('Configure the output directory.');
+
   const buildDirectory = path.join(
-    config.vaultPath,
-    config.buildFolder,
+    config.outputDirectory,
     `${safeName(config.characterClass)} - ${safeName(config.buildName)}`,
-    snapshotName
+    timestamp()
   );
-
   const itemsDirectory = path.join(buildDirectory, 'items');
   await fs.mkdir(itemsDirectory, { recursive: true });
 
-  for (const capture of Object.values(session.captures)) {
+  const captures = activeCaptures(config, session);
+  for (const capture of Object.values(captures)) {
     if (!capture) continue;
     await fs.copyFile(capture.filePath, path.join(itemsDirectory, path.basename(capture.filePath)));
   }
 
-  const collagePath = path.join(buildDirectory, 'build.png');
-  await createCollage(session.captures, collagePath);
+  const equipmentCaptures = Object.values(captures)
+    .filter((capture): capture is CaptureRecord => Boolean(capture))
+    .filter((capture) => !capture.slot.startsWith('stats-'))
+    .map((capture) => `- ${capture.slot}: ${captureImage(capture)}`)
+    .join('\n');
 
   const markdown = `---
 game: Diablo IV
-class: ${config.characterClass}
-build: ${config.buildName}
+class: ${yamlValue(config.characterClass)}
+build: ${yamlValue(config.buildName)}
+planner: ${yamlValue(config.buildUrl)}
 captured: ${new Date().toISOString()}
 ---
 
 # ${config.characterClass} · ${config.buildName}
 
-![[build.png]]
+${config.buildUrl ? `[Open build planner](<${config.buildUrl}>)` : ''}
 
-## Captures
+## Character Stats Overview
 
-${Object.values(session.captures)
-  .filter(Boolean)
-  .map((capture) => `- ${capture!.slot}: ![[items/${path.basename(capture!.filePath)}]]`)
-  .join('\n')}
+${statsOverview(captures)}
+
+## Equipment Captures
+
+${equipmentCaptures || '_No equipment captured._'}
 
 ## Session Notes
 
@@ -66,7 +103,7 @@ ${Object.values(session.captures)
 - Tested activity:
 - Result:
 
-## Suggested Request for Codex
+## AI Prompt
 
 Analyze the captures for this build. Identify inconsistencies among its affixes,
 tempers, aspects, and masterworks. Rank the next three upgrades by expected impact
@@ -76,17 +113,14 @@ and indicate where to obtain them.
   await fs.writeFile(path.join(buildDirectory, 'build.md'), markdown, 'utf8');
   await fs.writeFile(
     path.join(buildDirectory, 'build.json'),
-    JSON.stringify(
-      {
-        game: 'Diablo IV',
-        characterClass: config.characterClass,
-        buildName: config.buildName,
-        capturedAt: new Date().toISOString(),
-        captures: session.captures
-      },
-      null,
-      2
-    ),
+    JSON.stringify({
+      game: 'Diablo IV',
+      characterClass: config.characterClass,
+      buildName: config.buildName,
+      buildUrl: config.buildUrl,
+      capturedAt: new Date().toISOString(),
+      captures
+    }, null, 2),
     'utf8'
   );
 

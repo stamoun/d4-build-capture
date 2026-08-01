@@ -6,9 +6,16 @@
 - [x] Global shortcuts
 - [x] Fixed-region capture
 - [x] Slot-to-image association
-- [x] PNG collage
+- [x] Individual image export
+- [x] Character stats overview in Markdown
+- [x] Optional build planner URL
+- [x] Draft Windows release workflow
 - [x] Markdown and JSON export
 - [x] Sequential capture without overwriting completed slots
+- [x] Four-part stats capture
+- [x] Class selector
+- [x] Configurable shortcut
+- [x] Full-screen capture mode
 - [ ] Fix packaged Windows build
 - [ ] Validate screenshot capture from the packaged application
 - [ ] Fix UI and Markdown text encoding
@@ -25,7 +32,7 @@
 - [ ] Visual region selector
 - [ ] Countdown before capture
 - [ ] Discreet notification after capture
-- [ ] Shortcut reassignment
+- [x] Shortcut reassignment
 - [ ] Multi-monitor support
 
 ## 0.3 Analysis

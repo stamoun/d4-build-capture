@@ -1,7 +1,7 @@
 # Diablo Build Capture
 
 A small local Electron tool for capturing Diablo IV build tooltips and generating
-a Markdown + PNG snapshot in an Obsidian vault.
+a portable Markdown + PNG build snapshot.
 
 ## Getting Started
 
@@ -19,25 +19,26 @@ npm start
 
 ## Usage
 
-1. Select your Obsidian vault.
-2. Configure the tooltip region.
-3. Hover over an item in Diablo IV.
-4. Press Ctrl+Shift+Space to capture the next slot, or use a slot button to retake it.
-5. Click **Generate Build**.
+1. Select an output directory.
+2. Choose a class, enter a build name, and optionally paste a planner URL.
+3. Open Settings to configure the capture region or keyboard shortcut.
+4. Hover over an item in Diablo IV.
+5. Press Ctrl+Shift+Space to capture the next slot, or use a slot button to retake it.
+6. Click **Generate Build**.
 
 ## Default Shortcut
 
 | Shortcut | Action |
 |---|---|
-| Ctrl+Shift+Space | Capture the next incomplete slot |
+| ctrl-shift-space | Capture the next incomplete slot |
 
 ## MVP Limitations
 
-- The capture region is configured manually.
+- The capture region defaults to the primary display and can be configured manually.
 - No OCR.
 - No overlay in Diablo IV.
 - No automated game controls.
-- The collage uses a fixed grid.
+- Character stats are shown as a four-capture overview in the generated Markdown.
 
 ## Suggested Next Issues
 
@@ -53,6 +54,13 @@ npm start
 
 The renderer has no direct Node access. Every system operation goes through a
 limited preload and explicit IPC handlers.
+
+## Draft Releases
+
+Run the **Build Windows release** workflow manually from GitHub Actions and provide
+a release tag such as `v0.1.0`. The workflow validates the project, builds the
+Windows installer, and creates a draft GitHub release with generated release notes
+and the installer attached. Review and publish the draft from the Releases page.
 
 ## Suggested First Codex Prompt
 

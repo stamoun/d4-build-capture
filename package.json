@@ -2,7 +2,8 @@
   "name": "diablo-build-capture",
   "productName": "Diablo Build Capture",
   "version": "0.1.0",
-  "description": "Capture Diablo IV item tooltips and export build snapshots to Obsidian.",
+  "description": "Capture Diablo IV item tooltips and export portable build snapshots.",
+  "author": "D4BC Contributors",
   "main": ".webpack/main",
   "private": true,
   "scripts": {

@@ -5,6 +5,7 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
+  screen,
   shell
 } from 'electron';
 import fs from 'node:fs/promises';
@@ -13,7 +14,8 @@ import { captureRegion } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
 import { findNextUncapturedSlot } from './session';
-import type { AppConfig, ItemSlot, SessionState } from './types';
+import { toElectronAccelerator } from './shortcut';
+import { getItemSlots, type AppConfig, type ItemSlot, type SessionState } from './types';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -33,6 +35,16 @@ function tempCaptureDirectory(): string {
   return path.join(app.getPath('temp'), 'diablo-build-capture', session.id);
 }
 
+function fullScreenRegion(): AppConfig['captureRegion'] {
+  const display = screen.getPrimaryDisplay();
+  return {
+    x: 0,
+    y: 0,
+    width: Math.round(display.size.width * display.scaleFactor),
+    height: Math.round(display.size.height * display.scaleFactor)
+  };
+}
+
 async function emitState(): Promise<void> {
   mainWindow?.webContents.send('state:changed', { config, session });
 }
@@ -42,7 +54,7 @@ async function capture(slot: ItemSlot): Promise<void> {
     const outputPath = await captureRegion(
       tempCaptureDirectory(),
       slot,
-      config.captureRegion
+      config.captureFullScreen ? fullScreenRegion() : config.captureRegion
     );
 
     session.captures[slot] = {
@@ -61,7 +73,7 @@ async function capture(slot: ItemSlot): Promise<void> {
 }
 
 async function captureNextSlot(): Promise<void> {
-  const slot = findNextUncapturedSlot(session.captures);
+  const slot = findNextUncapturedSlot(session.captures, getItemSlots(config.characterClass));
   if (!slot) {
     dialog.showErrorBox('Capture Complete', 'All slots have already been captured.');
     return;
@@ -70,27 +82,30 @@ async function captureNextSlot(): Promise<void> {
   await capture(slot);
 }
 
-function registerShortcut(): void {
+function registerShortcut(): boolean {
+  globalShortcut.unregisterAll();
   const registered = globalShortcut.register(
-    'CommandOrControl+Shift+Space',
+    toElectronAccelerator(config.shortcut),
     () => void captureNextSlot()
   );
 
   if (!registered) {
     dialog.showErrorBox(
       'Shortcut Unavailable',
-      'Ctrl+Shift+Space is already registered by another application.'
+      `${config.shortcut} is invalid or already registered by another application.`
     );
   }
+
+  return registered;
 }
 
 async function createWindow(): Promise<void> {
-  config = await loadConfig();
+  config = await loadConfig(fullScreenRegion());
   session = newSession();
 
   const window = new BrowserWindow({
-    width: 920,
-    height: 760,
+    width: 906,
+    height: 844,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -129,18 +144,26 @@ app.on('window-all-closed', () => {
 ipcMain.handle('state:get', async () => ({ config, session }));
 
 ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
-  config = nextConfig;
-  await saveConfig(config);
+  const previousConfig = config;
+  config = await saveConfig({
+    ...nextConfig,
+    captureRegion: nextConfig.captureFullScreen ? fullScreenRegion() : nextConfig.captureRegion
+  });
+  if (!registerShortcut()) {
+    config = await saveConfig(previousConfig);
+    registerShortcut();
+    throw new Error('The requested shortcut could not be registered.');
+  }
   await emitState();
 });
 
-ipcMain.handle('vault:choose', async () => {
+ipcMain.handle('directory:choose', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return null;
-  config.vaultPath = result.filePaths[0];
-  await saveConfig(config);
+  config.outputDirectory = result.filePaths[0];
+  config = await saveConfig(config);
   await emitState();
-  return config.vaultPath;
+  return config.outputDirectory;
 });
 
 ipcMain.handle('capture:slot', async (_event, slot: ItemSlot) => {
