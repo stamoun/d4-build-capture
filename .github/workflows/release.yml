@@ -45,6 +45,13 @@ jobs:
       - name: Build Windows installer
         run: npm run make
 
+      - name: Store Windows release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: out/make/squirrel.windows/x64/
+          if-no-files-found: error
+
       - name: Create draft release with generated notes
         shell: pwsh
         env:
@@ -53,14 +60,14 @@ jobs:
           RELEASE_NAME: ${{ inputs.release_name }}
           IS_PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          $installer = Get-ChildItem -Path 'out/make/squirrel.windows/x64' -Filter '*.exe' | Select-Object -First 1
-          if (-not $installer) {
-            throw 'The Windows installer was not generated.'
+          $installers = @(Get-ChildItem -Path 'out/make/squirrel.windows/x64' -Filter '* Setup.exe')
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one Windows Setup.exe, found $($installers.Count)."
           }
 
           $title = if ($env:RELEASE_NAME) { $env:RELEASE_NAME } else { $env:RELEASE_TAG }
           $arguments = @(
-            'release', 'create', $env:RELEASE_TAG, $installer.FullName,
+            'release', 'create', $env:RELEASE_TAG, $installers[0].FullName,
             '--draft', '--generate-notes', '--title', $title,
             '--target', $env:GITHUB_SHA
           )
