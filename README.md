@@ -22,26 +22,14 @@ npm start
 1. Select your Obsidian vault.
 2. Configure the tooltip region.
 3. Hover over an item in Diablo IV.
-4. Use the shortcuts or the application buttons.
+4. Press Ctrl+Shift+Space to capture the next slot, or use a slot button to retake it.
 5. Click **Generate Build**.
 
-## Default Shortcuts
+## Default Shortcut
 
-| Shortcut | Slot |
+| Shortcut | Action |
 |---|---|
-| Ctrl+Shift+1 | Helmet |
-| Ctrl+Shift+2 | Chest |
-| Ctrl+Shift+3 | Gloves |
-| Ctrl+Shift+4 | Pants |
-| Ctrl+Shift+5 | Boots |
-| Ctrl+Shift+6 | Amulet |
-| Ctrl+Shift+7 | Ring 1 |
-| Ctrl+Shift+8 | Ring 2 |
-| Ctrl+Shift+9 | Weapon 1 |
-| Ctrl+Shift+A | Weapon 2 |
-| Ctrl+Shift+B | Weapon 3 |
-| Ctrl+Shift+C | Weapon 4 |
-| Ctrl+Shift+S | Stats |
+| Ctrl+Shift+Space | Capture the next incomplete slot |
 
 ## MVP Limitations
 

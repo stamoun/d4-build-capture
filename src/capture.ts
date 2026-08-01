@@ -3,6 +3,8 @@ import path from 'node:path';
 import screenshot from 'screenshot-desktop';
 import sharp from 'sharp';
 import type { CaptureRegion, ItemSlot } from './types';
+import 'screenshot-desktop/lib/win32/app.manifest';
+import 'screenshot-desktop/lib/win32/screenCapture_1.3.2.bat';
 
 export async function captureRegion(
   outputDirectory: string,

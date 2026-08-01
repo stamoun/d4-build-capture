@@ -76,7 +76,7 @@ function render(): void {
       </section>
 
       <footer>
-        Shortcuts: Ctrl+Shift+1 through 9, then A through C for weapons. Ctrl+Shift+S for stats.
+        Shortcut: Ctrl+Shift+Space captures the next incomplete slot.
       </footer>
     </main>
   `;

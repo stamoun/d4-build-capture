@@ -2,6 +2,11 @@ import type { ModuleOptions } from 'webpack';
 
 export const rules: Required<ModuleOptions>['rules'] = [
   {
+    test: /\.(bat|manifest)$/,
+    type: 'asset/resource',
+    generator: { filename: '[name][ext]' }
+  },
+  {
     test: /native_modules[/\\].+\.node$/,
     use: 'node-loader'
   },

@@ -6,7 +6,8 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { createCollage } from '../src/collage';
 import { exportSession } from '../src/exporter';
-import type { AppConfig, CaptureRecord, SessionState } from '../src/types';
+import { findNextUncapturedSlot } from '../src/session';
+import { ITEM_SLOTS, type AppConfig, type CaptureRecord, type SessionState } from '../src/types';
 
 async function createTemporaryDirectory(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'diablo-build-capture-test-'));
@@ -45,6 +46,22 @@ test('createCollage rejects an empty capture set', async () => {
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test('findNextUncapturedSlot advances without overwriting captures', () => {
+  const helmet: CaptureRecord = {
+    slot: 'helmet',
+    filePath: 'helmet.png',
+    capturedAt: '2026-07-31T12:00:00.000Z'
+  };
+
+  assert.equal(findNextUncapturedSlot({}), 'helmet');
+  assert.equal(findNextUncapturedSlot({ helmet }), 'chest');
+
+  const allCaptures = Object.fromEntries(
+    ITEM_SLOTS.map((slot) => [slot, { ...helmet, slot }])
+  ) as SessionState['captures'];
+  assert.equal(findNextUncapturedSlot(allCaptures), null);
 });
 
 test('createCollage generates the expected fixed-grid PNG', async () => {

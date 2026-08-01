@@ -4,6 +4,7 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  Menu,
   shell
 } from 'electron';
 import fs from 'node:fs/promises';
@@ -11,7 +12,8 @@ import path from 'node:path';
 import { captureRegion } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
-import { ITEM_SLOTS, type AppConfig, type ItemSlot, type SessionState } from './types';
+import { findNextUncapturedSlot } from './session';
+import type { AppConfig, ItemSlot, SessionState } from './types';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -58,13 +60,28 @@ async function capture(slot: ItemSlot): Promise<void> {
   }
 }
 
-function registerShortcuts(): void {
-  ITEM_SLOTS.slice(0, 12).forEach((slot, index) => {
-    const key = index < 9 ? String(index + 1) : String.fromCharCode(65 + index - 9);
-    globalShortcut.register(`CommandOrControl+Shift+${key}`, () => void capture(slot));
-  });
+async function captureNextSlot(): Promise<void> {
+  const slot = findNextUncapturedSlot(session.captures);
+  if (!slot) {
+    dialog.showErrorBox('Capture Complete', 'All slots have already been captured.');
+    return;
+  }
 
-  globalShortcut.register('CommandOrControl+Shift+S', () => void capture('stats'));
+  await capture(slot);
+}
+
+function registerShortcut(): void {
+  const registered = globalShortcut.register(
+    'CommandOrControl+Shift+Space',
+    () => void captureNextSlot()
+  );
+
+  if (!registered) {
+    dialog.showErrorBox(
+      'Shortcut Unavailable',
+      'Ctrl+Shift+Space is already registered by another application.'
+    );
+  }
 }
 
 async function createWindow(): Promise<void> {
@@ -94,8 +111,9 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(null);
   await createWindow();
-  registerShortcuts();
+  registerShortcut();
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();

@@ -12,7 +12,9 @@ import { rendererConfig } from './webpack.renderer.config';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true
+    asar: {
+      unpack: '*.{bat,manifest}'
+    }
   },
   rebuildConfig: {},
   makers: [
