@@ -7,6 +7,7 @@ rules.push({
 });
 
 export const rendererConfig: Configuration = {
+  devtool: 'source-map',
   module: { rules },
   resolve: { extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'] }
 };

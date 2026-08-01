@@ -71,7 +71,7 @@ async function createWindow(): Promise<void> {
   config = await loadConfig();
   session = newSession();
 
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 920,
     height: 760,
     webPreferences: {
@@ -81,8 +81,16 @@ async function createWindow(): Promise<void> {
     }
   });
 
-  await mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-  mainWindow.webContents.once('did-finish-load', () => void emitState());
+  mainWindow = window;
+
+  window.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error(`Preload failed: ${preloadPath}`, error);
+  });
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`Renderer failed to load (${errorCode}): ${errorDescription}`);
+  });
+  window.webContents.once('did-finish-load', () => void emitState());
+  await window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 }
 
 app.whenReady().then(async () => {
