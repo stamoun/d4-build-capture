@@ -1,14 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppConfig, ItemSlot, SessionState } from './types';
+import type { AppConfig, AppState, ItemSlot } from './types';
 
 export interface DiabloCaptureApi {
-  getState(): Promise<{ config: AppConfig; session: SessionState }>;
+  getState(): Promise<AppState>;
   saveConfig(config: AppConfig): Promise<void>;
   chooseOutputDirectory(): Promise<string | null>;
   capture(slot: ItemSlot): Promise<void>;
   resetSession(): Promise<void>;
   exportSession(): Promise<string>;
-  onStateChanged(callback: (state: { config: AppConfig; session: SessionState }) => void): void;
+  onStateChanged(callback: (state: AppState) => void): void;
 }
 
 contextBridge.exposeInMainWorld('diabloCapture', {

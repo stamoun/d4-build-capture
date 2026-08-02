@@ -15,7 +15,13 @@ import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
 import { findNextUncapturedSlot } from './session';
 import { toElectronAccelerator } from './shortcut';
-import { getItemSlots, type AppConfig, type ItemSlot, type SessionState } from './types';
+import {
+  getItemSlots,
+  type AppConfig,
+  type AppState,
+  type ItemSlot,
+  type SessionState
+} from './types';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -45,8 +51,12 @@ function fullScreenRegion(): AppConfig['captureRegion'] {
   };
 }
 
-async function emitState(): Promise<void> {
-  mainWindow?.webContents.send('state:changed', { config, session });
+function appState(): AppState {
+  return { config, session, version: app.getVersion() };
+}
+
+function emitState(): void {
+  mainWindow?.webContents.send('state:changed', appState());
 }
 
 async function capture(slot: ItemSlot): Promise<void> {
@@ -141,7 +151,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.handle('state:get', async () => ({ config, session }));
+ipcMain.handle('state:get', async () => appState());
 
 ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
   const previousConfig = config;

@@ -157,6 +157,8 @@ button:hover { border-color: #77644d; }
 .secondary { margin-right: auto; }
 
 footer {
+  display: flex;
+  justify-content: space-between;
   margin-top: 20px;
   color: #746f68;
   font-size: 12px;

@@ -6,6 +6,7 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { exportSession } from '../src/exporter';
 import { findNextUncapturedSlot } from '../src/session';
+import { findDisplaySource } from '../src/capture';
 import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
 import {
   getItemSlots,
@@ -51,6 +52,16 @@ test('findNextUncapturedSlot advances without overwriting captures', () => {
     ITEM_SLOTS.map((slot) => [slot, { ...helmet, slot }])
   ) as SessionState['captures'];
   assert.equal(findNextUncapturedSlot(allCaptures), null);
+});
+
+test('findDisplaySource selects the source matching the Electron display id', () => {
+  const sources = [
+    { display_id: '22', name: 'secondary' },
+    { display_id: '11', name: 'primary' }
+  ];
+
+  assert.equal(findDisplaySource(sources, 11)?.name, 'primary');
+  assert.equal(findDisplaySource(sources, 33), undefined);
 });
 
 test('weapon slots depend on the selected class', () => {

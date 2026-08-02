@@ -80,3 +80,9 @@ export interface SessionState {
   id: string;
   captures: Partial<Record<ItemSlot, CaptureRecord>>;
 }
+
+export interface AppState {
+  config: AppConfig;
+  session: SessionState;
+  version: string;
+}

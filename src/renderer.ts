@@ -66,6 +66,7 @@ function getAppElement(): HTMLDivElement {
 const appElement = getAppElement();
 let config: AppConfig;
 let session: SessionState;
+let version: string;
 
 function inputValue(id: string): string {
   return document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value ?? '';
@@ -145,7 +146,10 @@ function render(): void {
         <button id="exportSession" class="primary">Generate Build</button>
       </section>
 
-      <footer>Shortcut: ${escapeHtml(config.shortcut)} captures the next incomplete slot.</footer>
+      <footer>
+        <span>Shortcut: ${escapeHtml(config.shortcut)} captures the next incomplete slot.</span>
+        <span>v${escapeHtml(version)}</span>
+      </footer>
 
       <dialog id="settingsDialog">
         <form method="dialog">
@@ -261,11 +265,13 @@ function render(): void {
 window.diabloCapture.onStateChanged((state) => {
   config = state.config;
   session = state.session;
+  version = state.version;
   render();
 });
 
 void window.diabloCapture.getState().then((state) => {
   config = state.config;
   session = state.session;
+  version = state.version;
   render();
 });
