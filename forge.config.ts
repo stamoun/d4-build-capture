@@ -43,7 +43,7 @@ async function copySharpRuntime(
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: '**/*.{bat,manifest,node,dll}'
+      unpack: '**/{.**,**}/**/*.{bat,manifest,node,dll}'
     }
   },
   rebuildConfig: {},
