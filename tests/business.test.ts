@@ -9,6 +9,8 @@ import { findNextUncapturedSlot } from '../src/session';
 import { findDisplaySource } from '../src/capture';
 import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
 import {
+  CHARACTER_CLASSES,
+  getItemSlotLabel,
   getItemSlots,
   ITEM_SLOTS,
   type AppConfig,
@@ -64,23 +66,59 @@ test('findDisplaySource selects the source matching the Electron display id', ()
   assert.equal(findDisplaySource(sources, 33), undefined);
 });
 
-test('weapon slots depend on the selected class', () => {
-  const barbarianSlots = getItemSlots('Barbarian');
-  const druidSlots = getItemSlots('Druid');
+test('weapon slots and labels match each class equipment layout', () => {
+  const expectedWeapons = {
+    Barbarian: ['Main Hand', 'Off Hand', 'Two-Handed Bludgeoning', 'Two-Handed Slashing'],
+    Druid: ['Main Hand', 'Totem'],
+    Necromancer: ['Main Hand', 'Off Hand'],
+    Rogue: ['Main Hand', 'Off Hand', 'Ranged'],
+    Sorcerer: ['Main Hand', 'Focus'],
+    Spiritborn: ['Weapon'],
+    Paladin: ['Main Hand', 'Shield'],
+    Warlock: ['Main Hand', 'Focus']
+  } as const;
 
-  assert.equal(barbarianSlots.length, 16);
-  assert.equal(druidSlots.length, 14);
-  assert.equal(druidSlots.includes('weapon-3'), false);
-  assert.equal(druidSlots.includes('weapon-4'), false);
+  for (const characterClass of CHARACTER_CLASSES) {
+    const weaponSlots = getItemSlots(characterClass).filter((slot) => slot.startsWith('weapon-'));
+    assert.deepEqual(
+      weaponSlots.map((slot) => getItemSlotLabel(slot, characterClass)),
+      expectedWeapons[characterClass]
+    );
+  }
+
+  const druidSlots = getItemSlots('Druid');
+  const firstStatsIndex = druidSlots.indexOf('stats-1');
 
   const captures = Object.fromEntries(
-    druidSlots.slice(0, 10).map((slot) => [slot, {
+    druidSlots.slice(0, firstStatsIndex).map((slot) => [slot, {
       slot,
       filePath: `${slot}.png`,
       capturedAt: '2026-07-31T12:00:00.000Z'
     }])
   ) as SessionState['captures'];
   assert.equal(findNextUncapturedSlot(captures, druidSlots), 'stats-1');
+});
+
+test('every class includes six charm slots and one seal before weapons', () => {
+  const expectedTalismans = [
+    'charm-1',
+    'charm-2',
+    'charm-3',
+    'charm-4',
+    'charm-5',
+    'charm-6',
+    'seal'
+  ];
+
+  for (const characterClass of CHARACTER_CLASSES) {
+    const slots = getItemSlots(characterClass);
+    const firstCharmIndex = slots.indexOf('charm-1');
+    const firstWeaponIndex = slots.indexOf('weapon-1');
+
+    assert.deepEqual(slots.slice(firstCharmIndex, firstCharmIndex + 7), expectedTalismans);
+    assert.ok(firstCharmIndex > slots.indexOf('ring-2'));
+    assert.ok(firstWeaponIndex > firstCharmIndex + 6);
+  }
 });
 
 test('shortcut labels stay compact and convert to Electron accelerators', () => {
@@ -96,6 +134,8 @@ test('exportSession writes stats overview and filters inactive class slots', asy
   try {
     const helmet = await createCapture(directory, 'helmet', '#ff0000');
     const stats1 = await createCapture(directory, 'stats-1', '#00ff00');
+    const charm1 = await createCapture(directory, 'charm-1', '#ffff00');
+    const seal = await createCapture(directory, 'seal', '#00ffff');
     const weapon3 = await createCapture(directory, 'weapon-3', '#0000ff');
     const config: AppConfig = {
       outputDirectory: path.join(directory, 'builds'),
@@ -108,7 +148,7 @@ test('exportSession writes stats overview and filters inactive class slots', asy
     };
     const session: SessionState = {
       id: 'test-session',
-      captures: { helmet, 'stats-1': stats1, 'weapon-3': weapon3 }
+      captures: { helmet, 'stats-1': stats1, 'charm-1': charm1, seal, 'weapon-3': weapon3 }
     };
 
     const outputDirectory = await exportSession(config, session);
@@ -129,6 +169,8 @@ test('exportSession writes stats overview and filters inactive class slots', asy
     assert.match(markdown, /## Character Stats Overview/);
     assert.match(markdown, /!\[stats-1\]\(items\/stats-1\.png\)/);
     assert.match(markdown, /- helmet: !\[helmet\]\(items\/helmet\.png\)/);
+    assert.match(markdown, /- charm-1: !\[charm-1\]\(items\/charm-1\.png\)/);
+    assert.match(markdown, /- seal: !\[seal\]\(items\/seal\.png\)/);
     assert.doesNotMatch(markdown, /weapon-3/);
     assert.equal(manifest.characterClass, 'Sorcerer');
     assert.equal(manifest.buildName, 'Frozen: Orb');
@@ -136,6 +178,8 @@ test('exportSession writes stats overview and filters inactive class slots', asy
     assert.equal(manifest.captures['weapon-3'], undefined);
     await assert.rejects(fs.access(path.join(outputDirectory, 'build.png')));
     await fs.access(path.join(outputDirectory, 'items', 'helmet.png'));
+    await fs.access(path.join(outputDirectory, 'items', 'charm-1.png'));
+    await fs.access(path.join(outputDirectory, 'items', 'seal.png'));
     await fs.access(path.join(outputDirectory, 'items', 'stats-1.png'));
   } finally {
     await fs.rm(directory, { recursive: true, force: true });

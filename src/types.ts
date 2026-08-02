@@ -7,6 +7,13 @@ export const ITEM_SLOTS = [
   'amulet',
   'ring-1',
   'ring-2',
+  'charm-1',
+  'charm-2',
+  'charm-3',
+  'charm-4',
+  'charm-5',
+  'charm-6',
+  'seal',
   'weapon-1',
   'weapon-2',
   'weapon-3',
@@ -32,7 +39,7 @@ export const CHARACTER_CLASSES = [
 
 export type CharacterClass = (typeof CHARACTER_CLASSES)[number];
 
-const STANDARD_ITEM_SLOTS: readonly ItemSlot[] = [
+const ARMOR_AND_JEWELRY_SLOTS: readonly ItemSlot[] = [
   'helmet',
   'chest',
   'gloves',
@@ -41,16 +48,66 @@ const STANDARD_ITEM_SLOTS: readonly ItemSlot[] = [
   'amulet',
   'ring-1',
   'ring-2',
-  'weapon-1',
-  'weapon-2',
+];
+
+const STATS_SLOTS: readonly ItemSlot[] = [
   'stats-1',
   'stats-2',
   'stats-3',
   'stats-4'
 ];
 
+const TALISMAN_SLOTS: readonly ItemSlot[] = [
+  'charm-1',
+  'charm-2',
+  'charm-3',
+  'charm-4',
+  'charm-5',
+  'charm-6',
+  'seal'
+];
+
+const STANDARD_ITEM_SLOTS: readonly ItemSlot[] = [
+  ...ARMOR_AND_JEWELRY_SLOTS,
+  ...TALISMAN_SLOTS,
+  'weapon-1',
+  'weapon-2',
+  ...STATS_SLOTS
+];
+
 export function getItemSlots(characterClass: CharacterClass): readonly ItemSlot[] {
-  return characterClass === 'Barbarian' ? ITEM_SLOTS : STANDARD_ITEM_SLOTS;
+  if (characterClass === 'Barbarian') return ITEM_SLOTS;
+  if (characterClass === 'Rogue') {
+    return [
+      ...ARMOR_AND_JEWELRY_SLOTS,
+      ...TALISMAN_SLOTS,
+      'weapon-1',
+      'weapon-2',
+      'weapon-3',
+      ...STATS_SLOTS
+    ];
+  }
+  if (characterClass === 'Spiritborn') {
+    return [...ARMOR_AND_JEWELRY_SLOTS, ...TALISMAN_SLOTS, 'weapon-1', ...STATS_SLOTS];
+  }
+  return STANDARD_ITEM_SLOTS;
+}
+
+const WEAPON_SLOT_LABELS: Record<CharacterClass, readonly string[]> = {
+  Barbarian: ['Main Hand', 'Off Hand', 'Two-Handed Bludgeoning', 'Two-Handed Slashing'],
+  Druid: ['Main Hand', 'Totem'],
+  Necromancer: ['Main Hand', 'Off Hand'],
+  Rogue: ['Main Hand', 'Off Hand', 'Ranged'],
+  Sorcerer: ['Main Hand', 'Focus'],
+  Spiritborn: ['Weapon'],
+  Paladin: ['Main Hand', 'Shield'],
+  Warlock: ['Main Hand', 'Focus']
+};
+
+export function getItemSlotLabel(slot: ItemSlot, characterClass: CharacterClass): string | undefined {
+  if (!slot.startsWith('weapon-')) return undefined;
+  const weaponIndex = Number(slot.slice('weapon-'.length)) - 1;
+  return WEAPON_SLOT_LABELS[characterClass][weaponIndex];
 }
 
 export interface CaptureRegion {

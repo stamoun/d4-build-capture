@@ -2,6 +2,7 @@ import { buildShortcutLabel } from './shortcut';
 import './styles.css';
 import {
   CHARACTER_CLASSES,
+  getItemSlotLabel,
   getItemSlots,
   type AppConfig,
   type CharacterClass,
@@ -29,6 +30,13 @@ const SLOT_LABELS: Partial<Record<ItemSlot, string>> = {
   amulet: 'Amulet',
   'ring-1': 'Ring 1',
   'ring-2': 'Ring 2',
+  'charm-1': 'Charm 1',
+  'charm-2': 'Charm 2',
+  'charm-3': 'Charm 3',
+  'charm-4': 'Charm 4',
+  'charm-5': 'Charm 5',
+  'charm-6': 'Charm 6',
+  seal: 'Seal',
   'stats-1': 'Stats 1',
   'stats-2': 'Stats 2',
   'stats-3': 'Stats 3',
@@ -36,11 +44,7 @@ const SLOT_LABELS: Partial<Record<ItemSlot, string>> = {
 };
 
 function slotLabel(slot: ItemSlot, characterClass: CharacterClass): string {
-  if (slot === 'weapon-1') return characterClass === 'Barbarian' ? 'Weapon 1' : 'Main Hand';
-  if (slot === 'weapon-2') return characterClass === 'Barbarian' ? 'Weapon 2' : 'Off Hand';
-  if (slot === 'weapon-3') return 'Weapon 3';
-  if (slot === 'weapon-4') return 'Weapon 4';
-  return SLOT_LABELS[slot] ?? slot;
+  return getItemSlotLabel(slot, characterClass) ?? SLOT_LABELS[slot] ?? slot;
 }
 
 function escapeHtml(value: string): string {
