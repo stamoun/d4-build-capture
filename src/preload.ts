@@ -1,10 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppConfig, AppState, ItemSlot } from './types';
+import type { AppConfig, AppState, BuildDetails, ItemSlot } from './types';
 
 export interface DiabloCaptureApi {
   getState(): Promise<AppState>;
   saveConfig(config: AppConfig): Promise<void>;
+  saveBuildDetails(details: BuildDetails): Promise<void>;
   chooseOutputDirectory(): Promise<string | null>;
+  openBuildUrl(): Promise<void>;
+  openOutputDirectory(): Promise<void>;
   capture(slot: ItemSlot): Promise<void>;
   resetSession(): Promise<void>;
   exportSession(): Promise<string>;
@@ -14,7 +17,10 @@ export interface DiabloCaptureApi {
 contextBridge.exposeInMainWorld('diabloCapture', {
   getState: () => ipcRenderer.invoke('state:get'),
   saveConfig: (config: AppConfig) => ipcRenderer.invoke('config:save', config),
+  saveBuildDetails: (details: BuildDetails) => ipcRenderer.invoke('build-details:save', details),
   chooseOutputDirectory: () => ipcRenderer.invoke('directory:choose'),
+  openBuildUrl: () => ipcRenderer.invoke('build-url:open'),
+  openOutputDirectory: () => ipcRenderer.invoke('directory:open'),
   capture: (slot: ItemSlot) => ipcRenderer.invoke('capture:slot', slot),
   resetSession: () => ipcRenderer.invoke('capture:retake-all'),
   exportSession: () => ipcRenderer.invoke('export:session'),

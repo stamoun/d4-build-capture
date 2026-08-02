@@ -7,6 +7,10 @@ export const ITEM_SLOTS = [
   'amulet',
   'ring-1',
   'ring-2',
+  'weapon-1',
+  'weapon-2',
+  'weapon-3',
+  'weapon-4',
   'charm-1',
   'charm-2',
   'charm-3',
@@ -14,10 +18,6 @@ export const ITEM_SLOTS = [
   'charm-5',
   'charm-6',
   'seal',
-  'weapon-1',
-  'weapon-2',
-  'weapon-3',
-  'weapon-4',
   'stats-1',
   'stats-2',
   'stats-3',
@@ -25,6 +25,14 @@ export const ITEM_SLOTS = [
 ] as const;
 
 export type ItemSlot = (typeof ITEM_SLOTS)[number];
+
+export type ItemSlotGroup = 'equipment' | 'talisman' | 'stats';
+
+export function getItemSlotGroup(slot: ItemSlot): ItemSlotGroup {
+  if (slot.startsWith('stats-')) return 'stats';
+  if (slot.startsWith('charm-') || slot === 'seal') return 'talisman';
+  return 'equipment';
+}
 
 export const CHARACTER_CLASSES = [
   'Barbarian',
@@ -69,9 +77,9 @@ const TALISMAN_SLOTS: readonly ItemSlot[] = [
 
 const STANDARD_ITEM_SLOTS: readonly ItemSlot[] = [
   ...ARMOR_AND_JEWELRY_SLOTS,
-  ...TALISMAN_SLOTS,
   'weapon-1',
   'weapon-2',
+  ...TALISMAN_SLOTS,
   ...STATS_SLOTS
 ];
 
@@ -80,15 +88,15 @@ export function getItemSlots(characterClass: CharacterClass): readonly ItemSlot[
   if (characterClass === 'Rogue') {
     return [
       ...ARMOR_AND_JEWELRY_SLOTS,
-      ...TALISMAN_SLOTS,
       'weapon-1',
       'weapon-2',
       'weapon-3',
+      ...TALISMAN_SLOTS,
       ...STATS_SLOTS
     ];
   }
   if (characterClass === 'Spiritborn') {
-    return [...ARMOR_AND_JEWELRY_SLOTS, ...TALISMAN_SLOTS, 'weapon-1', ...STATS_SLOTS];
+    return [...ARMOR_AND_JEWELRY_SLOTS, 'weapon-1', ...TALISMAN_SLOTS, ...STATS_SLOTS];
   }
   return STANDARD_ITEM_SLOTS;
 }
@@ -126,6 +134,8 @@ export interface AppConfig {
   captureFullScreen: boolean;
   shortcut: string;
 }
+
+export type BuildDetails = Pick<AppConfig, 'buildName' | 'buildUrl'>;
 
 export interface CaptureRecord {
   slot: ItemSlot;

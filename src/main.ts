@@ -19,6 +19,7 @@ import {
   getItemSlots,
   type AppConfig,
   type AppState,
+  type BuildDetails,
   type ItemSlot,
   type SessionState
 } from './types';
@@ -167,6 +168,10 @@ ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
   await emitState();
 });
 
+ipcMain.handle('build-details:save', async (_event, details: BuildDetails) => {
+  config = await saveConfig({ ...config, ...details });
+});
+
 ipcMain.handle('directory:choose', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return null;
@@ -174,6 +179,17 @@ ipcMain.handle('directory:choose', async () => {
   config = await saveConfig(config);
   await emitState();
   return config.outputDirectory;
+});
+
+ipcMain.handle('build-url:open', async () => {
+  if (!config.buildUrl) return;
+  await shell.openExternal(config.buildUrl);
+});
+
+ipcMain.handle('directory:open', async () => {
+  if (!config.outputDirectory) return;
+  const error = await shell.openPath(config.outputDirectory);
+  if (error) throw new Error(error);
 });
 
 ipcMain.handle('capture:slot', async (_event, slot: ItemSlot) => {

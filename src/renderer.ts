@@ -1,12 +1,15 @@
 import { buildShortcutLabel } from './shortcut';
+import { findNextUncapturedSlot } from './session';
 import './styles.css';
 import {
   CHARACTER_CLASSES,
   getItemSlotLabel,
+  getItemSlotGroup,
   getItemSlots,
   type AppConfig,
   type CharacterClass,
   type ItemSlot,
+  type ItemSlotGroup,
   type SessionState,
 } from './types';
 
@@ -43,6 +46,12 @@ const SLOT_LABELS: Partial<Record<ItemSlot, string>> = {
   'stats-4': 'Stats 4',
 };
 
+const SLOT_GROUPS: readonly { id: ItemSlotGroup; title: string }[] = [
+  { id: 'equipment', title: 'Equipment' },
+  { id: 'talisman', title: 'Talisman' },
+  { id: 'stats', title: 'Stats' },
+];
+
 function slotLabel(slot: ItemSlot, characterClass: CharacterClass): string {
   return getItemSlotLabel(slot, characterClass) ?? SLOT_LABELS[slot] ?? slot;
 }
@@ -71,6 +80,7 @@ const appElement = getAppElement();
 let config: AppConfig;
 let session: SessionState;
 let version: string;
+let buildDetailsOpen = false;
 
 function inputValue(id: string): string {
   return document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value ?? '';
@@ -83,9 +93,26 @@ function buildUrlIsValid(): boolean {
   return false;
 }
 
+async function saveBuildDetails(): Promise<boolean> {
+  if (!buildUrlIsValid()) return false;
+  const details = {
+    buildName: inputValue('buildName'),
+    buildUrl: inputValue('buildUrl'),
+  };
+  await window.diabloCapture.saveBuildDetails(details);
+  config = { ...config, ...details };
+  const summaryName = document.querySelector<HTMLElement>('#buildSummaryName');
+  if (summaryName) summaryName.textContent = details.buildName;
+  const buildLink = document.querySelector<HTMLButtonElement>('#openBuildUrl');
+  if (buildLink) buildLink.disabled = !details.buildUrl;
+  return true;
+}
+
 function render(): void {
   const activeSlots = getItemSlots(config.characterClass);
   const completedCount = activeSlots.filter((slot) => session.captures[slot]).length;
+  const nextSlot = findNextUncapturedSlot(session.captures, activeSlots);
+  const nextSlotGroup = nextSlot ? getItemSlotGroup(nextSlot) : null;
 
   appElement.innerHTML = `
     <main>
@@ -101,53 +128,81 @@ function render(): void {
         </div>
       </header>
 
-      <section class="panel form-grid">
-        <label>
-          Class
-          <select id="characterClass">
-            ${CHARACTER_CLASSES.map(
-              (characterClass) => `
-              <option value="${characterClass}" ${characterClass === config.characterClass ? 'selected' : ''}>
-                ${CLASS_ICONS[characterClass]} ${characterClass}
-              </option>
-            `,
-            ).join('')}
-          </select>
-        </label>
-        <label>
-          Build
-          <input id="buildName" value="${escapeHtml(config.buildName)}" />
-        </label>
-        <label class="wide">
-          Build URL
-          <input id="buildUrl" type="url" value="${escapeHtml(config.buildUrl)}" placeholder="https://..." />
-        </label>
-        <label class="wide">
-          Output Directory
-          <div class="inline">
-            <input id="outputDirectory" value="${escapeHtml(config.outputDirectory)}" readonly />
-            <button id="chooseOutputDirectory">Choose</button>
-          </div>
-        </label>
-      </section>
+      <details id="buildDetails" class="panel build-details" ${buildDetailsOpen ? 'open' : ''}>
+        <summary>
+          <span class="build-summary-value">
+            <small>Class</small>
+            <strong>${CLASS_ICONS[config.characterClass]} ${config.characterClass}</strong>
+          </span>
+          <span class="build-summary-value">
+            <small>Build</small>
+            <strong id="buildSummaryName">${escapeHtml(config.buildName)}</strong>
+          </span>
+          <span class="build-summary-actions">
+            <button id="openBuildUrl" class="summary-link" ${config.buildUrl ? '' : 'disabled'}>Build</button>
+            <button id="openOutputDirectory" class="summary-folder" aria-label="Open output directory" title="Output Directory" ${config.outputDirectory ? '' : 'disabled'}>📁</button>
+          </span>
+        </summary>
+        <section class="form-grid build-details-form">
+          <label>
+            Class
+            <select id="characterClass">
+              ${CHARACTER_CLASSES.map(
+                (characterClass) => `
+                <option value="${characterClass}" ${characterClass === config.characterClass ? 'selected' : ''}>
+                  ${CLASS_ICONS[characterClass]} ${characterClass}
+                </option>
+              `,
+              ).join('')}
+            </select>
+          </label>
+          <label>
+            Build
+            <input id="buildName" value="${escapeHtml(config.buildName)}" />
+          </label>
+          <label class="wide">
+            Build URL
+            <input id="buildUrl" type="url" value="${escapeHtml(config.buildUrl)}" placeholder="https://..." />
+          </label>
+          <label class="wide">
+            Output Directory
+            <div class="inline">
+              <input id="outputDirectory" value="${escapeHtml(config.outputDirectory)}" readonly />
+              <button id="chooseOutputDirectory">Choose</button>
+            </div>
+          </label>
+        </section>
+      </details>
 
-      <section class="slots">
-        ${activeSlots
-          .map(
-            (slot, index) => `
-          <button class="slot ${session.captures[slot] ? 'done' : ''}" data-slot="${slot}">
-            <span>${session.captures[slot] ? '✓' : index + 1}</span>
-            <strong>${slotLabel(slot, config.characterClass)}</strong>
-          </button>
-        `,
-          )
-          .join('')}
+      <section class="slot-accordion">
+        ${SLOT_GROUPS.map(({ id, title }) => {
+          const groupSlots = activeSlots.filter((slot) => getItemSlotGroup(slot) === id);
+          const groupCompletedCount = groupSlots.filter((slot) => session.captures[slot]).length;
+          return `
+          <details class="panel slot-section" name="capture-slots" ${nextSlotGroup === id ? 'open' : ''}>
+            <summary>
+              <strong>${title}</strong>
+              <span>${groupCompletedCount}/${groupSlots.length}</span>
+            </summary>
+            <div class="slots">
+              ${groupSlots
+                .map((slot) => {
+                  const slotIndex = activeSlots.indexOf(slot);
+                  return `
+                <button class="slot ${session.captures[slot] ? 'done' : ''} ${nextSlot === slot ? 'next' : ''}" data-slot="${slot}">
+                  <span>${session.captures[slot] ? '✓' : slotIndex + 1}</span>
+                  <strong>${slotLabel(slot, config.characterClass)}</strong>
+                </button>`;
+                })
+                .join('')}
+            </div>
+          </details>`;
+        }).join('')}
       </section>
 
       <section class="actions">
         <button id="resetSession" class="secondary">Clear</button>
-        <button id="saveDetails">Save Details</button>
-        <button id="exportSession" class="primary">Generate Build</button>
+        <button id="exportSession" class="primary">Generate</button>
       </section>
 
       <footer>
@@ -194,6 +249,22 @@ function render(): void {
     });
   });
 
+  document.querySelector<HTMLDetailsElement>('#buildDetails')?.addEventListener('toggle', (event) => {
+    buildDetailsOpen = (event.currentTarget as HTMLDetailsElement).open;
+  });
+
+  document.querySelector('#openBuildUrl')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void window.diabloCapture.openBuildUrl();
+  });
+
+  document.querySelector('#openOutputDirectory')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void window.diabloCapture.openOutputDirectory();
+  });
+
   document.querySelector('#chooseOutputDirectory')?.addEventListener('click', () => {
     void window.diabloCapture.chooseOutputDirectory();
   });
@@ -208,14 +279,12 @@ function render(): void {
     });
   });
 
-  document.querySelector('#saveDetails')?.addEventListener('click', () => {
-    if (!buildUrlIsValid()) return;
-    void window.diabloCapture.saveConfig({
-      ...config,
-      characterClass: inputValue('characterClass') as CharacterClass,
-      buildName: inputValue('buildName'),
-      buildUrl: inputValue('buildUrl'),
-    });
+  document.querySelector('#buildName')?.addEventListener('change', () => {
+    void saveBuildDetails();
+  });
+
+  document.querySelector('#buildUrl')?.addEventListener('change', () => {
+    void saveBuildDetails();
   });
 
   document.querySelector('#resetSession')?.addEventListener('click', () => {
@@ -223,7 +292,10 @@ function render(): void {
   });
 
   document.querySelector('#exportSession')?.addEventListener('click', () => {
-    void window.diabloCapture.exportSession();
+    void saveBuildDetails().then((saved) => {
+      if (saved) return window.diabloCapture.exportSession();
+      return undefined;
+    });
   });
 
   const settingsDialog = document.querySelector<HTMLDialogElement>('#settingsDialog');

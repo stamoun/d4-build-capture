@@ -11,6 +11,7 @@ import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } fro
 import {
   CHARACTER_CLASSES,
   getItemSlotLabel,
+  getItemSlotGroup,
   getItemSlots,
   ITEM_SLOTS,
   type AppConfig,
@@ -99,7 +100,7 @@ test('weapon slots and labels match each class equipment layout', () => {
   assert.equal(findNextUncapturedSlot(captures, druidSlots), 'stats-1');
 });
 
-test('every class includes six charm slots and one seal before weapons', () => {
+test('every class includes six charm slots and one seal after equipment and before stats', () => {
   const expectedTalismans = [
     'charm-1',
     'charm-2',
@@ -113,11 +114,30 @@ test('every class includes six charm slots and one seal before weapons', () => {
   for (const characterClass of CHARACTER_CLASSES) {
     const slots = getItemSlots(characterClass);
     const firstCharmIndex = slots.indexOf('charm-1');
-    const firstWeaponIndex = slots.indexOf('weapon-1');
+    const lastWeaponIndex = Math.max(
+      ...slots
+        .filter((slot) => slot.startsWith('weapon-'))
+        .map((slot) => slots.indexOf(slot))
+    );
+    const firstStatsIndex = slots.indexOf('stats-1');
 
     assert.deepEqual(slots.slice(firstCharmIndex, firstCharmIndex + 7), expectedTalismans);
-    assert.ok(firstCharmIndex > slots.indexOf('ring-2'));
-    assert.ok(firstWeaponIndex > firstCharmIndex + 6);
+    assert.equal(firstCharmIndex, lastWeaponIndex + 1);
+    assert.equal(firstStatsIndex, firstCharmIndex + expectedTalismans.length);
+  }
+});
+
+test('item slots are partitioned into equipment, talisman, and stats groups', () => {
+  for (const characterClass of CHARACTER_CLASSES) {
+    const groups = getItemSlots(characterClass).map(getItemSlotGroup);
+    const firstTalismanIndex = groups.indexOf('talisman');
+    const firstStatsIndex = groups.indexOf('stats');
+
+    assert.ok(groups.slice(0, firstTalismanIndex).every((group) => group === 'equipment'));
+    assert.ok(
+      groups.slice(firstTalismanIndex, firstStatsIndex).every((group) => group === 'talisman')
+    );
+    assert.ok(groups.slice(firstStatsIndex).every((group) => group === 'stats'));
   }
 });
 
