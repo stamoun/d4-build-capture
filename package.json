@@ -6,6 +6,9 @@
   "author": "D4BC Contributors",
   "main": ".webpack/main",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
