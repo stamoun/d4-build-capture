@@ -10,6 +10,7 @@ import {
 } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import started from 'electron-squirrel-startup';
 import { captureRegion } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
@@ -26,6 +27,8 @@ import {
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+
+if (started) app.quit();
 
 let mainWindow: BrowserWindow | null = null;
 let config: AppConfig;

@@ -42,6 +42,7 @@ async function copySharpRuntime(
 
 const config: ForgeConfig = {
   packagerConfig: {
+    icon: 'assets/d4bc.ico',
     asar: {
       unpack: '**/{.**,**}/**/*.{node,dll}'
     }
@@ -51,7 +52,10 @@ const config: ForgeConfig = {
     packageAfterPrune: copySharpRuntime
   },
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupIcon: 'assets/d4bc.ico',
+      loadingGif: 'assets/installer-loading.gif'
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({})
