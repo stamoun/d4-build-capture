@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { desktopCapturer, screen } from 'electron';
 import sharp from 'sharp';
-import type { CaptureRegion, ItemSlot } from './types';
+import type { ItemSlot } from './types';
 
 interface DisplayCaptureSource {
   display_id: string;
@@ -15,7 +15,12 @@ export function findDisplaySource<T extends DisplayCaptureSource>(
   return sources.find(({ display_id: sourceDisplayId }) => sourceDisplayId === String(displayId));
 }
 
-async function capturePrimaryDisplay(): Promise<Buffer> {
+export async function captureFullScreen(
+  outputDirectory: string,
+  slot: ItemSlot
+): Promise<string> {
+  await fs.mkdir(outputDirectory, { recursive: true });
+
   const display = screen.getPrimaryDisplay();
   const thumbnailSize = {
     width: Math.round(display.size.width * display.scaleFactor),
@@ -31,26 +36,10 @@ async function capturePrimaryDisplay(): Promise<Buffer> {
     throw new Error('Windows returned an empty screen capture.');
   }
 
-  return source.thumbnail.resize(thumbnailSize).toPNG();
-}
-
-export async function captureRegion(
-  outputDirectory: string,
-  slot: ItemSlot,
-  region: CaptureRegion
-): Promise<string> {
-  await fs.mkdir(outputDirectory, { recursive: true });
-
-  const fullScreen = await capturePrimaryDisplay();
+  const fullScreen = source.thumbnail.resize(thumbnailSize).toPNG();
   const outputPath = path.join(outputDirectory, `${slot}.png`);
 
-  await sharp(fullScreen)
-    .extract({
-      left: region.x,
-      top: region.y,
-      width: region.width,
-      height: region.height
-    })
+  await sharp(await fullScreen)
     .png()
     .toFile(outputPath);
 

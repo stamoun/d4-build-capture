@@ -171,8 +171,6 @@ test('exportSession writes stats overview and filters inactive class slots', asy
       characterClass: 'Sorcerer',
       buildName: 'Frozen: Orb',
       buildUrl: 'https://example.com/frozen-orb',
-      captureRegion: { x: 0, y: 0, width: 100, height: 150 },
-      captureFullScreen: false,
       shortcut: 'ctrl-shift-space',
     };
     const session: SessionState = {

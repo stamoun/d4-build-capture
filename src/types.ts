@@ -98,20 +98,11 @@ export function getItemSlotLabel(slot: ItemSlot, characterClass: CharacterClass)
   return WEAPON_SLOT_LABELS[characterClass][weaponIndex];
 }
 
-export interface CaptureRegion {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export interface AppConfig {
   outputDirectory: string;
   characterClass: CharacterClass;
   buildName: string;
   buildUrl: string;
-  captureRegion: CaptureRegion;
-  captureFullScreen: boolean;
   shortcut: string;
 }
 
@@ -132,6 +123,7 @@ export interface AppState {
   config: AppConfig;
   session: SessionState;
   version: string;
+  tempDirectory: string;
   selectedSlot: ItemSlot | null;
   capturingSlot: ItemSlot | null;
 }

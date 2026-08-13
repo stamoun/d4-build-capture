@@ -80,6 +80,7 @@ const appElement = getAppElement();
 let config: AppConfig;
 let session: SessionState;
 let version: string;
+let tempDirectory: string;
 let selectedSlot: ItemSlot | null;
 let capturingSlot: ItemSlot | null;
 let buildDetailsOpen = false;
@@ -171,7 +172,17 @@ function render(): void {
             Output Directory
             <div class="inline">
               <input id="outputDirectory" value="${escapeHtml(config.outputDirectory)}" readonly />
-              <button id="chooseOutputDirectory">Choose</button>
+              <button id="chooseOutputDirectory" class="icon-button" aria-label="Choose output directory" title="Choose Output Directory">📁</button>
+            </div>
+          </label>
+          <label class="wide">
+            Temporary Screenshots
+            <div class="inline">
+              <input id="tempDirectory" value="${escapeHtml(tempDirectory)}" readonly />
+              <span class="icon-buttons">
+                <button id="openTempDirectory" class="icon-button" aria-label="Open temporary folder" title="Open Temporary Folder">📁</button>
+                <button id="clearTempDirectory" class="icon-button" aria-label="Clear temporary screenshots" title="Clear Temporary Screenshots">🗑</button>
+              </span>
             </div>
           </label>
         </section>
@@ -223,14 +234,6 @@ function render(): void {
             <button value="cancel" class="icon-button" aria-label="Close settings">×</button>
           </div>
           <section class="settings-grid">
-            <label class="wide checkbox-label">
-              <input id="captureFullScreen" type="checkbox" ${config.captureFullScreen ? 'checked' : ''} />
-              Capture full screen
-            </label>
-            <label>Region X<input class="region-input" id="regionX" type="number" min="0" value="${config.captureRegion.x}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Region Y<input class="region-input" id="regionY" type="number" min="0" value="${config.captureRegion.y}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Width<input class="region-input" id="regionWidth" type="number" min="1" value="${config.captureRegion.width}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Height<input class="region-input" id="regionHeight" type="number" min="1" value="${config.captureRegion.height}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
             <label class="wide">
               Capture shortcut
               <input id="shortcut" value="${escapeHtml(config.shortcut)}" placeholder="ctrl-shift-space" readonly />
@@ -272,6 +275,16 @@ function render(): void {
     void window.diabloCapture.chooseOutputDirectory();
   });
 
+  document.querySelector('#openTempDirectory')?.addEventListener('click', () => {
+    void window.diabloCapture.openTempDirectory();
+  });
+
+  document.querySelector('#clearTempDirectory')?.addEventListener('click', () => {
+    if (confirm('Clear all temporary screenshots? This cannot be undone.')) {
+      void window.diabloCapture.clearTempDirectory();
+    }
+  });
+
   document.querySelector('#characterClass')?.addEventListener('change', () => {
     if (!buildUrlIsValid()) return;
     void window.diabloCapture.saveConfig({
@@ -304,13 +317,6 @@ function render(): void {
   const settingsDialog = document.querySelector<HTMLDialogElement>('#settingsDialog');
   document.querySelector('#openSettings')?.addEventListener('click', () => settingsDialog?.showModal());
 
-  const fullScreenInput = document.querySelector<HTMLInputElement>('#captureFullScreen');
-  fullScreenInput?.addEventListener('change', () => {
-    document.querySelectorAll<HTMLInputElement>('.region-input').forEach((input) => {
-      input.disabled = fullScreenInput.checked;
-    });
-  });
-
   const shortcutInput = document.querySelector<HTMLInputElement>('#shortcut');
   shortcutInput?.addEventListener('keydown', (event) => {
     event.preventDefault();
@@ -328,13 +334,6 @@ function render(): void {
     void window.diabloCapture
       .saveConfig({
         ...config,
-        captureRegion: {
-          x: Number(inputValue('regionX')),
-          y: Number(inputValue('regionY')),
-          width: Number(inputValue('regionWidth')),
-          height: Number(inputValue('regionHeight')),
-        },
-        captureFullScreen: fullScreenInput?.checked ?? false,
         shortcut: inputValue('shortcut'),
       })
       .then(() => settingsDialog?.close());
@@ -345,6 +344,7 @@ window.diabloCapture.onStateChanged((state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
   render();
@@ -354,6 +354,7 @@ void window.diabloCapture.getState().then((state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
   render();

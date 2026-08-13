@@ -5,13 +5,12 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
-  screen,
   shell
 } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { captureRegion } from './capture';
+import { captureFullScreen } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
 import { findCaptureSlot, findFollowingSlot } from './session';
@@ -43,22 +42,16 @@ function newSession(): SessionState {
   };
 }
 
-function tempCaptureDirectory(): string {
-  return path.join(app.getPath('temp'), 'diablo-build-capture', session.id);
+function tempRootDirectory(): string {
+  return path.join(app.getPath('temp'), 'diablo-build-capture');
 }
 
-function fullScreenRegion(): AppConfig['captureRegion'] {
-  const display = screen.getPrimaryDisplay();
-  return {
-    x: 0,
-    y: 0,
-    width: Math.round(display.size.width * display.scaleFactor),
-    height: Math.round(display.size.height * display.scaleFactor)
-  };
+function tempCaptureDirectory(): string {
+  return path.join(tempRootDirectory(), session.id);
 }
 
 function appState(): AppState {
-  return { config, session, version: app.getVersion(), selectedSlot, capturingSlot };
+  return { config, session, version: app.getVersion(), tempDirectory: tempRootDirectory(), selectedSlot, capturingSlot };
 }
 
 function emitState(): void {
@@ -72,10 +65,9 @@ async function capture(slot: ItemSlot): Promise<void> {
   emitState();
 
   try {
-    const outputPath = await captureRegion(
+    const outputPath = await captureFullScreen(
       tempCaptureDirectory(),
-      slot,
-      config.captureFullScreen ? fullScreenRegion() : config.captureRegion
+      slot
     );
 
     session.captures[slot] = {
@@ -130,7 +122,7 @@ function registerShortcut(): boolean {
 }
 
 async function createWindow(): Promise<void> {
-  config = await loadConfig(fullScreenRegion());
+  config = await loadConfig();
   session = newSession();
 
   const window = new BrowserWindow({
@@ -176,10 +168,7 @@ ipcMain.handle('state:get', async () => appState());
 ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
   const previousConfig = config;
   if (nextConfig.characterClass !== config.characterClass) selectedSlot = null;
-  config = await saveConfig({
-    ...nextConfig,
-    captureRegion: nextConfig.captureFullScreen ? fullScreenRegion() : nextConfig.captureRegion
-  });
+  config = await saveConfig(nextConfig);
   if (!registerShortcut()) {
     config = await saveConfig(previousConfig);
     registerShortcut();
@@ -229,4 +218,34 @@ ipcMain.handle('export:session', async () => {
   const outputDirectory = await exportSession(config, session);
   await shell.openPath(outputDirectory);
   return outputDirectory;
+});
+
+ipcMain.handle('temp-directory:get', async () => {
+  return tempRootDirectory();
+});
+
+ipcMain.handle('temp-directory:open', async () => {
+  const tempDir = tempRootDirectory();
+  await fs.mkdir(tempDir, { recursive: true });
+  const error = await shell.openPath(tempDir);
+  if (error) throw new Error(error);
+});
+
+ipcMain.handle('temp-directory:clear', async () => {
+  const rootDir = tempRootDirectory();
+  await fs.mkdir(rootDir, { recursive: true });
+  
+  // Get all items in the root directory
+  const items = await fs.readdir(rootDir, { withFileTypes: true });
+  
+  // Delete all subdirectories (session folders) but keep the root
+  for (const item of items) {
+    if (item.isDirectory()) {
+      await fs.rm(path.join(rootDir, item.name), { recursive: true, force: true });
+    }
+  }
+  
+  session = newSession();
+  selectedSlot = null;
+  await emitState();
 });

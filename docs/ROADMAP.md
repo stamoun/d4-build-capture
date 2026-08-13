@@ -4,7 +4,7 @@
 
 - [x] Persistent configuration
 - [x] Global shortcuts
-- [x] Fixed-region capture
+- [x] Full-screen capture
 - [x] Slot-to-image association
 - [x] Individual image export
 - [x] Character stats overview in Markdown
@@ -15,12 +15,10 @@
 - [x] Four-part stats capture
 - [x] Class selector
 - [x] Configurable shortcut
-- [x] Full-screen capture mode
 - [ ] Fix packaged Windows build
 - [ ] Validate screenshot capture from the packaged application
 - [ ] Fix UI and Markdown text encoding
 - [ ] Validate IPC payloads at runtime
-- [ ] Validate capture regions against display bounds
 - [ ] In-app preview
 - [ ] Define and enforce the incomplete-export policy
 - [ ] Validate the complete workflow at two resolutions
@@ -34,7 +32,6 @@
 - [ ] Talisman data capture
 - [ ] Skill tree capture
 - [ ] Paragon board capture
-- [ ] Visual region selector
 - [ ] Countdown before capture
 - [ ] Discreet notification after capture
 - [x] Shortcut reassignment
