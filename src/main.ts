@@ -25,6 +25,8 @@ import {
   type SessionState
 } from './types';
 
+const PROJECT_URL = 'https://github.com/stamoun/d4-build-capture';
+
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
@@ -50,6 +52,12 @@ function tempRootDirectory(): string {
 
 function tempCaptureDirectory(): string {
   return path.join(tempRootDirectory(), session.id);
+}
+
+async function clearTemporaryCaptures(): Promise<void> {
+  const rootDirectory = tempRootDirectory();
+  await fs.rm(rootDirectory, { recursive: true, force: true });
+  await fs.mkdir(rootDirectory, { recursive: true });
 }
 
 function appState(): AppState {
@@ -128,8 +136,10 @@ async function createWindow(): Promise<void> {
   session = newSession();
 
   const window = new BrowserWindow({
-    width: 906,
-    height: 844,
+    width: 960,
+    height: 860,
+    minWidth: 720,
+    minHeight: 760,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -234,7 +244,12 @@ ipcMain.handle('capture:retake-all', async () => {
 
 ipcMain.handle('export:session', async () => {
   const outputDirectory = await exportSession(config, session);
-  await shell.openPath(outputDirectory);
+  await clearTemporaryCaptures();
+  session = newSession();
+  selectedSlot = null;
+  await emitState();
+  const error = await shell.openPath(outputDirectory);
+  if (error) throw new Error(error);
   return outputDirectory;
 });
 
@@ -250,19 +265,7 @@ ipcMain.handle('temp-directory:open', async () => {
 });
 
 ipcMain.handle('temp-directory:clear', async () => {
-  const rootDir = tempRootDirectory();
-  await fs.mkdir(rootDir, { recursive: true });
-  
-  // Get all items in the root directory
-  const items = await fs.readdir(rootDir, { withFileTypes: true });
-  
-  // Delete all subdirectories (session folders) but keep the root
-  for (const item of items) {
-    if (item.isDirectory()) {
-      await fs.rm(path.join(rootDir, item.name), { recursive: true, force: true });
-    }
-  }
-  
+  await clearTemporaryCaptures();
   session = newSession();
   selectedSlot = null;
   await emitState();
@@ -279,3 +282,5 @@ ipcMain.handle('preview:get', async (_event, slot: ItemSlot) => {
     return null;
   }
 });
+
+ipcMain.handle('project-url:open', () => shell.openExternal(PROJECT_URL));

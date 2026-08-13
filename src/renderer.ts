@@ -217,17 +217,18 @@ function render(): void {
   const nextSlot = findNextUncapturedSlot(session.captures, activeSlots);
   const activeSlot = selectedSlot && activeSlots.includes(selectedSlot) ? selectedSlot : nextSlot;
   const nextSlotGroup = activeSlot ? getItemSlotGroup(activeSlot) : null;
+  const captureGuidance = activeSlot
+    ? `Hover your <strong>${escapeHtml(slotLabel(activeSlot, config.characterClass))}</strong> in Diablo IV, then press <kbd>${escapeHtml(config.shortcut)}</kbd>.`
+    : '<strong>All captures complete.</strong> Review the captured images or export the snapshot.';
 
   appElement.innerHTML = `
     <main>
       <header>
         <div>
           <p class="eyebrow">DIABLO IV</p>
-          <h1>Build Capture</h1>
-          <p>Capture tooltips, then generate a Markdown build snapshot.</p>
+          <h1><a id="openProjectUrl" class="title-link" href="https://github.com/stamoun/d4-build-capture">Build Capture <span>v${escapeHtml(version)}</span></a></h1>
         </div>
         <div class="header-actions">
-          <span class="badge">${completedCount}/${activeSlots.length}</span>
           <button id="openSettings" class="icon-button" aria-label="Open settings" title="Settings">⚙</button>
         </div>
       </header>
@@ -275,19 +276,12 @@ function render(): void {
               <button id="chooseOutputDirectory" class="icon-button" aria-label="Choose output directory" title="Choose Output Directory">📁</button>
             </div>
           </label>
-          <label class="wide">
-            Temporary Screenshots
-            <div class="inline">
-              <input id="tempDirectory" value="${escapeHtml(tempDirectory)}" readonly />
-              <span class="icon-buttons">
-                <button id="openTempDirectory" class="icon-button" aria-label="Open temporary folder" title="Open Temporary Folder">📁</button>
-                <button id="clearTempDirectory" class="icon-button" aria-label="Clear temporary screenshots" title="Clear Temporary Screenshots">🗑</button>
-              </span>
-            </div>
-          </label>
         </section>
       </details>
 
+      <section class="capture-guidance" aria-live="polite">${captureGuidance}</section>
+
+      <div class="capture-workspace ${screenshotPreview && selectedSlot ? 'has-preview' : ''}">
       ${screenshotPreview && selectedSlot ? `
       <section class="panel screenshot-preview">
         <div class="preview-header">
@@ -321,11 +315,19 @@ function render(): void {
             <div class="slots">
               ${groupSlots
                 .map((slot) => {
-                  const slotIndex = activeSlots.indexOf(slot);
+                  const slotState = capturingSlot === slot
+                    ? '<i class="spinner" aria-label="Capturing"></i>'
+                    : selectedSlot === slot
+                      ? '<small class="slot-state">SELECTED</small>'
+                      : activeSlot === slot
+                        ? '<small class="slot-state">NEXT</small>'
+                        : session.captures[slot]
+                          ? '<small class="slot-state">CAPTURED</small>'
+                          : '';
                   return `
                 <button class="slot ${session.captures[slot] ? 'done' : ''} ${activeSlot === slot ? 'next' : ''} ${selectedSlot === slot ? 'selected' : ''} ${capturingSlot === slot ? 'capturing' : ''}" data-slot="${slot}" aria-pressed="${selectedSlot === slot}" ${capturingSlot ? 'disabled' : ''}>
-                  <span>${capturingSlot === slot ? '<i class="spinner" aria-hidden="true"></i>' : session.captures[slot] ? '✓' : slotIndex + 1}</span>
                   <strong>${slotLabel(slot, config.characterClass)}</strong>
+                  ${slotState}
                 </button>`;
                 })
                 .join('')}
@@ -333,16 +335,16 @@ function render(): void {
           </details>`;
         }).join('')}
       </section>
+      </div>
 
-      <section class="actions">
-        <button id="resetSession" class="secondary">Clear</button>
-        <button id="exportSession" class="primary">Generate</button>
+      <section class="actions panel">
+        <div class="export-progress">
+          <strong>${completedCount} of ${activeSlots.length} captured</strong>
+          <span>${activeSlots.length - completedCount} remaining</span>
+        </div>
+        <button id="resetSession" class="danger-secondary">Clear</button>
+        <button id="exportSession" class="primary">Export</button>
       </section>
-
-      <footer>
-        <span>Shortcut: ${escapeHtml(config.shortcut)} captures the selected slot, or the next incomplete slot.</span>
-        <span>v${escapeHtml(version)}</span>
-      </footer>
 
       <dialog id="settingsDialog">
         <form method="dialog">
@@ -358,6 +360,17 @@ function render(): void {
               Capture shortcut
               <input id="shortcut" value="${escapeHtml(config.shortcut)}" placeholder="ctrl-shift-space" readonly />
               <small>Focus the field, then press the new key combination.</small>
+            </label>
+            <label class="wide">
+              Temporary Screenshots
+              <div class="inline">
+                <input id="tempDirectory" value="${escapeHtml(tempDirectory)}" readonly />
+                <span class="icon-buttons">
+                  <button id="openTempDirectory" type="button" class="icon-button" aria-label="Open temporary folder" title="Open Temporary Folder">📁</button>
+                  <button id="clearTempDirectory" type="button" class="icon-button danger-icon" aria-label="Clear temporary screenshots" title="Clear Temporary Screenshots">🗑</button>
+                </span>
+              </div>
+              <small>Captured images are stored here until the session is exported or cleared.</small>
             </label>
           </section>
           <div class="dialog-actions">
@@ -416,6 +429,11 @@ function render(): void {
     event.preventDefault();
     event.stopPropagation();
     void window.diabloCapture.openOutputDirectory();
+  });
+
+  document.querySelector('#openProjectUrl')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    void window.diabloCapture.openProjectUrl();
   });
 
   document.querySelector('#chooseOutputDirectory')?.addEventListener('click', () => {

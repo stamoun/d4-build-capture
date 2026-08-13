@@ -13,7 +13,7 @@ body {
 }
 
 main {
-  max-width: 980px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 32px;
 }
@@ -27,20 +27,30 @@ header {
 
 h1 { margin: 0; font-size: 40px; }
 
-header p { color: #aaa49a; }
+.title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.title-link span {
+  color: #aaa49a;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.title-link:hover { color: #f0c98f; }
+
+.title-link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #d9a765;
+  outline-offset: 4px;
+}
 
 .eyebrow {
   margin: 0 0 6px;
   font-size: 12px;
   letter-spacing: .2em;
   color: #c68b4a;
-}
-
-.badge {
-  padding: 10px 14px;
-  border: 1px solid #3b3731;
-  border-radius: 999px;
-  background: #171719;
 }
 
 .header-actions {
@@ -102,7 +112,7 @@ header p { color: #aaa49a; }
 }
 
 .build-summary-value small {
-  color: #746f68;
+  color: #9a948b;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .08em;
@@ -208,10 +218,39 @@ button:hover { border-color: #77644d; }
 
 .slot-accordion {
   display: grid;
+  order: 1;
   margin: 20px 0;
 }
 
+.capture-guidance {
+  margin-top: 20px;
+  padding: 13px 16px;
+  color: #c8c1b6;
+  background: #171513;
+  border: 1px solid #3b3328;
+  border-radius: 10px;
+}
+
+.capture-guidance strong { color: #f4f1ea; }
+
+kbd {
+  padding: 3px 7px;
+  color: #f0c98f;
+  background: #0d0d0f;
+  border: 1px solid #4b4134;
+  border-radius: 5px;
+  font: 12px ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.capture-workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .screenshot-preview {
+  order: 2;
   padding: 0;
   margin: 20px 0;
   overflow: hidden;
@@ -232,7 +271,7 @@ button:hover { border-color: #77644d; }
 }
 
 .preview-zoom-level {
-  color: #746f68;
+  color: #aaa49a;
   font-size: 12px;
   font-family: monospace;
 }
@@ -304,7 +343,7 @@ button:hover { border-color: #77644d; }
 .slot-section[open] summary strong::before { transform: rotate(90deg); }
 
 .slot-section summary span {
-  color: #746f68;
+  color: #aaa49a;
   font-size: 12px;
 }
 
@@ -320,24 +359,23 @@ button:hover { border-color: #77644d; }
 .slot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 8px;
   min-height: 62px;
   text-transform: capitalize;
 }
 
-.slot span {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #111114;
+.slot-state {
+  color: #d9a765;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
 }
 
 .slot.done {
-  border-color: #92713f;
-  background: #2a2118;
+  color: #c4bdb3;
+  border-color: #4e4336;
+  background: #1d1916;
 }
 
 .slot.next {
@@ -379,23 +417,68 @@ button:hover { border-color: #77644d; }
 
 .actions {
   display: flex;
+  align-items: center;
   gap: 10px;
-  justify-content: flex-end;
+  padding: 14px 16px;
 }
 
 .primary {
-  background: #8f2b20;
-  border-color: #b54536;
+  color: #17110a;
+  background: #d9a765;
+  border-color: #edbd7e;
+  font-weight: 700;
 }
 
-.secondary { margin-right: auto; }
+.primary:hover {
+  background: #e3b574;
+  border-color: #f0c98f;
+}
 
-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-  color: #746f68;
+.export-progress {
+  display: grid;
+  gap: 3px;
+  margin-right: auto;
+}
+
+.export-progress span {
+  color: #aaa49a;
   font-size: 12px;
+}
+
+.danger-secondary {
+  color: #e6a098;
+  background: transparent;
+  border-color: #6e3832;
+}
+
+.danger-secondary:hover {
+  color: #ffc0b9;
+  border-color: #a65045;
+}
+
+.danger-icon { color: #e6a098; }
+
+.danger-icon:hover {
+  color: #ffc0b9;
+  border-color: #a65045;
+}
+
+@media (min-width: 1100px) {
+  .capture-workspace.has-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, .8fr);
+    align-items: start;
+    gap: 20px;
+  }
+
+  .capture-workspace.has-preview .slot-accordion { margin-right: 0; }
+
+  .capture-workspace.has-preview .slots { grid-template-columns: repeat(2, 1fr); }
+
+  .capture-workspace.has-preview .screenshot-preview {
+    position: sticky;
+    top: 20px;
+  }
 }
 
 dialog {
@@ -450,7 +533,7 @@ h2 { margin: 0; font-size: 28px; }
 }
 
 small {
-  color: #746f68;
+  color: #9a948b;
   line-height: 1.4;
 }
 
