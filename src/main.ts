@@ -14,7 +14,7 @@ import started from 'electron-squirrel-startup';
 import { captureRegion } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
-import { findNextUncapturedSlot } from './session';
+import { findCaptureSlot, findFollowingSlot } from './session';
 import { toElectronAccelerator } from './shortcut';
 import {
   getItemSlots,
@@ -33,6 +33,8 @@ if (started) app.quit();
 let mainWindow: BrowserWindow | null = null;
 let config: AppConfig;
 let session: SessionState;
+let selectedSlot: ItemSlot | null = null;
+let capturingSlot: ItemSlot | null = null;
 
 function newSession(): SessionState {
   return {
@@ -56,7 +58,7 @@ function fullScreenRegion(): AppConfig['captureRegion'] {
 }
 
 function appState(): AppState {
-  return { config, session, version: app.getVersion() };
+  return { config, session, version: app.getVersion(), selectedSlot, capturingSlot };
 }
 
 function emitState(): void {
@@ -64,6 +66,11 @@ function emitState(): void {
 }
 
 async function capture(slot: ItemSlot): Promise<void> {
+  if (capturingSlot) return;
+  const isSelectedRetake = selectedSlot === slot;
+  capturingSlot = slot;
+  emitState();
+
   try {
     const outputPath = await captureRegion(
       tempCaptureDirectory(),
@@ -77,17 +84,26 @@ async function capture(slot: ItemSlot): Promise<void> {
       capturedAt: new Date().toISOString()
     };
 
-    await emitState();
+    selectedSlot = isSelectedRetake
+      ? findFollowingSlot(slot, getItemSlots(config.characterClass))
+      : null;
   } catch (error) {
     dialog.showErrorBox(
       'Capture Failed',
       error instanceof Error ? error.message : String(error)
     );
+  } finally {
+    capturingSlot = null;
+    emitState();
   }
 }
 
 async function captureNextSlot(): Promise<void> {
-  const slot = findNextUncapturedSlot(session.captures, getItemSlots(config.characterClass));
+  const slot = findCaptureSlot(
+    session.captures,
+    getItemSlots(config.characterClass),
+    selectedSlot
+  );
   if (!slot) {
     dialog.showErrorBox('Capture Complete', 'All slots have already been captured.');
     return;
@@ -159,6 +175,7 @@ ipcMain.handle('state:get', async () => appState());
 
 ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
   const previousConfig = config;
+  if (nextConfig.characterClass !== config.characterClass) selectedSlot = null;
   config = await saveConfig({
     ...nextConfig,
     captureRegion: nextConfig.captureFullScreen ? fullScreenRegion() : nextConfig.captureRegion
@@ -195,13 +212,16 @@ ipcMain.handle('directory:open', async () => {
   if (error) throw new Error(error);
 });
 
-ipcMain.handle('capture:slot', async (_event, slot: ItemSlot) => {
-  await capture(slot);
+ipcMain.handle('capture:select-slot', async (_event, slot: ItemSlot) => {
+  if (!getItemSlots(config.characterClass).includes(slot)) return;
+  selectedSlot = selectedSlot === slot ? null : slot;
+  emitState();
 });
 
 ipcMain.handle('capture:retake-all', async () => {
   await fs.rm(tempCaptureDirectory(), { recursive: true, force: true });
   session = newSession();
+  selectedSlot = null;
   await emitState();
 });
 

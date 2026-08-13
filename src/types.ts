@@ -21,7 +21,7 @@ export const ITEM_SLOTS = [
   'stats-1',
   'stats-2',
   'stats-3',
-  'stats-4'
+  'stats-4',
 ] as const;
 
 export type ItemSlot = (typeof ITEM_SLOTS)[number];
@@ -42,7 +42,7 @@ export const CHARACTER_CLASSES = [
   'Sorcerer',
   'Spiritborn',
   'Paladin',
-  'Warlock'
+  'Warlock',
 ] as const;
 
 export type CharacterClass = (typeof CHARACTER_CLASSES)[number];
@@ -58,42 +58,22 @@ const ARMOR_AND_JEWELRY_SLOTS: readonly ItemSlot[] = [
   'ring-2',
 ];
 
-const STATS_SLOTS: readonly ItemSlot[] = [
-  'stats-1',
-  'stats-2',
-  'stats-3',
-  'stats-4'
-];
+const STATS_SLOTS: readonly ItemSlot[] = ['stats-1', 'stats-2', 'stats-3', 'stats-4'];
 
-const TALISMAN_SLOTS: readonly ItemSlot[] = [
-  'charm-1',
-  'charm-2',
-  'charm-3',
-  'charm-4',
-  'charm-5',
-  'charm-6',
-  'seal'
-];
+const TALISMAN_SLOTS: readonly ItemSlot[] = ['charm-1', 'charm-2', 'charm-3', 'charm-4', 'charm-5', 'charm-6', 'seal'];
 
 const STANDARD_ITEM_SLOTS: readonly ItemSlot[] = [
   ...ARMOR_AND_JEWELRY_SLOTS,
   'weapon-1',
   'weapon-2',
   ...TALISMAN_SLOTS,
-  ...STATS_SLOTS
+  ...STATS_SLOTS,
 ];
 
 export function getItemSlots(characterClass: CharacterClass): readonly ItemSlot[] {
   if (characterClass === 'Barbarian') return ITEM_SLOTS;
   if (characterClass === 'Rogue') {
-    return [
-      ...ARMOR_AND_JEWELRY_SLOTS,
-      'weapon-1',
-      'weapon-2',
-      'weapon-3',
-      ...TALISMAN_SLOTS,
-      ...STATS_SLOTS
-    ];
+    return [...ARMOR_AND_JEWELRY_SLOTS, 'weapon-1', 'weapon-2', 'weapon-3', ...TALISMAN_SLOTS, ...STATS_SLOTS];
   }
   if (characterClass === 'Spiritborn') {
     return [...ARMOR_AND_JEWELRY_SLOTS, 'weapon-1', ...TALISMAN_SLOTS, ...STATS_SLOTS];
@@ -102,14 +82,14 @@ export function getItemSlots(characterClass: CharacterClass): readonly ItemSlot[
 }
 
 const WEAPON_SLOT_LABELS: Record<CharacterClass, readonly string[]> = {
-  Barbarian: ['Main Hand', 'Off Hand', 'Two-Handed Bludgeoning', 'Two-Handed Slashing'],
+  Barbarian: ['Main Hand', 'Off Hand', '2h Bludgeoning', '2h Slashing'],
   Druid: ['Main Hand', 'Totem'],
   Necromancer: ['Main Hand', 'Off Hand'],
   Rogue: ['Main Hand', 'Off Hand', 'Ranged'],
   Sorcerer: ['Main Hand', 'Focus'],
   Spiritborn: ['Weapon'],
   Paladin: ['Main Hand', 'Shield'],
-  Warlock: ['Main Hand', 'Focus']
+  Warlock: ['Main Hand', 'Focus'],
 };
 
 export function getItemSlotLabel(slot: ItemSlot, characterClass: CharacterClass): string | undefined {
@@ -152,4 +132,6 @@ export interface AppState {
   config: AppConfig;
   session: SessionState;
   version: string;
+  selectedSlot: ItemSlot | null;
+  capturingSlot: ItemSlot | null;
 }

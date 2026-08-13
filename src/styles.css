@@ -286,6 +286,38 @@ button:hover { border-color: #77644d; }
   box-shadow: 0 0 0 2px #c68b4a22;
 }
 
+.slot.selected {
+  background: #342719;
+  box-shadow: 0 0 0 2px #c68b4a55;
+}
+
+.slot:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+
+.slot.capturing {
+  border-color: #d9a765;
+  opacity: 1;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #746f68;
+  border-top-color: #d9a765;
+  border-radius: 50%;
+  animation: slot-spin 700ms linear infinite;
+}
+
+@keyframes slot-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1400ms; }
+}
+
 .actions {
   display: flex;
   gap: 10px;

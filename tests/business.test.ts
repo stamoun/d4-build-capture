@@ -4,39 +4,37 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import sharp from 'sharp';
-import { exportSession } from '../src/exporter';
-import { findNextUncapturedSlot } from '../src/session';
 import { findDisplaySource } from '../src/capture';
+import { exportSession } from '../src/exporter';
+import { findCaptureSlot, findFollowingSlot, findNextUncapturedSlot } from '../src/session';
 import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
 import {
   CHARACTER_CLASSES,
-  getItemSlotLabel,
   getItemSlotGroup,
+  getItemSlotLabel,
   getItemSlots,
   ITEM_SLOTS,
   type AppConfig,
   type CaptureRecord,
-  type SessionState
+  type SessionState,
 } from '../src/types';
 
 async function createTemporaryDirectory(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'diablo-build-capture-test-'));
 }
 
-async function createCapture(
-  directory: string,
-  slot: CaptureRecord['slot'],
-  color: string
-): Promise<CaptureRecord> {
+async function createCapture(directory: string, slot: CaptureRecord['slot'], color: string): Promise<CaptureRecord> {
   const filePath = path.join(directory, `${slot}.png`);
   await sharp({
     create: {
       width: 100,
       height: 150,
       channels: 4,
-      background: color
-    }
-  }).png().toFile(filePath);
+      background: color,
+    },
+  })
+    .png()
+    .toFile(filePath);
 
   return { slot, filePath, capturedAt: '2026-07-31T12:00:00.000Z' };
 }
@@ -45,22 +43,42 @@ test('findNextUncapturedSlot advances without overwriting captures', () => {
   const helmet: CaptureRecord = {
     slot: 'helmet',
     filePath: 'helmet.png',
-    capturedAt: '2026-07-31T12:00:00.000Z'
+    capturedAt: '2026-07-31T12:00:00.000Z',
   };
 
   assert.equal(findNextUncapturedSlot({}), 'helmet');
   assert.equal(findNextUncapturedSlot({ helmet }), 'chest');
 
   const allCaptures = Object.fromEntries(
-    ITEM_SLOTS.map((slot) => [slot, { ...helmet, slot }])
+    ITEM_SLOTS.map((slot) => [slot, { ...helmet, slot }]),
   ) as SessionState['captures'];
   assert.equal(findNextUncapturedSlot(allCaptures), null);
+});
+
+test('findCaptureSlot prioritizes a selected slot so an existing capture can be overwritten', () => {
+  const helmet: CaptureRecord = {
+    slot: 'helmet',
+    filePath: 'helmet.png',
+    capturedAt: '2026-07-31T12:00:00.000Z',
+  };
+
+  assert.equal(findCaptureSlot({ helmet }, ['helmet', 'chest'], 'helmet'), 'helmet');
+  assert.equal(findCaptureSlot({ helmet }, ['helmet', 'chest'], null), 'chest');
+  assert.equal(findCaptureSlot({ helmet }, ['helmet', 'chest'], 'weapon-1'), 'chest');
+});
+
+test('findFollowingSlot advances selected retakes and wraps after the last slot', () => {
+  const slots = ['helmet', 'chest', 'gloves'] as const;
+
+  assert.equal(findFollowingSlot('chest', slots), 'gloves');
+  assert.equal(findFollowingSlot('gloves', slots), 'helmet');
+  assert.equal(findFollowingSlot('weapon-1', slots), null);
 });
 
 test('findDisplaySource selects the source matching the Electron display id', () => {
   const sources = [
     { display_id: '22', name: 'secondary' },
-    { display_id: '11', name: 'primary' }
+    { display_id: '11', name: 'primary' },
   ];
 
   assert.equal(findDisplaySource(sources, 11)?.name, 'primary');
@@ -69,21 +87,21 @@ test('findDisplaySource selects the source matching the Electron display id', ()
 
 test('weapon slots and labels match each class equipment layout', () => {
   const expectedWeapons = {
-    Barbarian: ['Main Hand', 'Off Hand', 'Two-Handed Bludgeoning', 'Two-Handed Slashing'],
+    Barbarian: ['Main Hand', 'Off Hand', '2h Bludgeoning', '2h Slashing'],
     Druid: ['Main Hand', 'Totem'],
     Necromancer: ['Main Hand', 'Off Hand'],
     Rogue: ['Main Hand', 'Off Hand', 'Ranged'],
     Sorcerer: ['Main Hand', 'Focus'],
     Spiritborn: ['Weapon'],
     Paladin: ['Main Hand', 'Shield'],
-    Warlock: ['Main Hand', 'Focus']
+    Warlock: ['Main Hand', 'Focus'],
   } as const;
 
   for (const characterClass of CHARACTER_CLASSES) {
     const weaponSlots = getItemSlots(characterClass).filter((slot) => slot.startsWith('weapon-'));
     assert.deepEqual(
       weaponSlots.map((slot) => getItemSlotLabel(slot, characterClass)),
-      expectedWeapons[characterClass]
+      expectedWeapons[characterClass],
     );
   }
 
@@ -91,33 +109,26 @@ test('weapon slots and labels match each class equipment layout', () => {
   const firstStatsIndex = druidSlots.indexOf('stats-1');
 
   const captures = Object.fromEntries(
-    druidSlots.slice(0, firstStatsIndex).map((slot) => [slot, {
+    druidSlots.slice(0, firstStatsIndex).map((slot) => [
       slot,
-      filePath: `${slot}.png`,
-      capturedAt: '2026-07-31T12:00:00.000Z'
-    }])
+      {
+        slot,
+        filePath: `${slot}.png`,
+        capturedAt: '2026-07-31T12:00:00.000Z',
+      },
+    ]),
   ) as SessionState['captures'];
   assert.equal(findNextUncapturedSlot(captures, druidSlots), 'stats-1');
 });
 
 test('every class includes six charm slots and one seal after equipment and before stats', () => {
-  const expectedTalismans = [
-    'charm-1',
-    'charm-2',
-    'charm-3',
-    'charm-4',
-    'charm-5',
-    'charm-6',
-    'seal'
-  ];
+  const expectedTalismans = ['charm-1', 'charm-2', 'charm-3', 'charm-4', 'charm-5', 'charm-6', 'seal'];
 
   for (const characterClass of CHARACTER_CLASSES) {
     const slots = getItemSlots(characterClass);
     const firstCharmIndex = slots.indexOf('charm-1');
     const lastWeaponIndex = Math.max(
-      ...slots
-        .filter((slot) => slot.startsWith('weapon-'))
-        .map((slot) => slots.indexOf(slot))
+      ...slots.filter((slot) => slot.startsWith('weapon-')).map((slot) => slots.indexOf(slot)),
     );
     const firstStatsIndex = slots.indexOf('stats-1');
 
@@ -134,9 +145,7 @@ test('item slots are partitioned into equipment, talisman, and stats groups', ()
     const firstStatsIndex = groups.indexOf('stats');
 
     assert.ok(groups.slice(0, firstTalismanIndex).every((group) => group === 'equipment'));
-    assert.ok(
-      groups.slice(firstTalismanIndex, firstStatsIndex).every((group) => group === 'talisman')
-    );
+    assert.ok(groups.slice(firstTalismanIndex, firstStatsIndex).every((group) => group === 'talisman'));
     assert.ok(groups.slice(firstStatsIndex).every((group) => group === 'stats'));
   }
 });
@@ -164,19 +173,17 @@ test('exportSession writes stats overview and filters inactive class slots', asy
       buildUrl: 'https://example.com/frozen-orb',
       captureRegion: { x: 0, y: 0, width: 100, height: 150 },
       captureFullScreen: false,
-      shortcut: 'ctrl-shift-space'
+      shortcut: 'ctrl-shift-space',
     };
     const session: SessionState = {
       id: 'test-session',
-      captures: { helmet, 'stats-1': stats1, 'charm-1': charm1, seal, 'weapon-3': weapon3 }
+      captures: { helmet, 'stats-1': stats1, 'charm-1': charm1, seal, 'weapon-3': weapon3 },
     };
 
     const outputDirectory = await exportSession(config, session);
     assert.match(path.basename(outputDirectory), /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
     const markdown = await fs.readFile(path.join(outputDirectory, 'build.md'), 'utf8');
-    const manifest = JSON.parse(
-      await fs.readFile(path.join(outputDirectory, 'build.json'), 'utf8')
-    ) as {
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDirectory, 'build.json'), 'utf8')) as {
       characterClass: string;
       buildName: string;
       buildUrl: string;

@@ -80,6 +80,8 @@ const appElement = getAppElement();
 let config: AppConfig;
 let session: SessionState;
 let version: string;
+let selectedSlot: ItemSlot | null;
+let capturingSlot: ItemSlot | null;
 let buildDetailsOpen = false;
 
 function inputValue(id: string): string {
@@ -112,7 +114,8 @@ function render(): void {
   const activeSlots = getItemSlots(config.characterClass);
   const completedCount = activeSlots.filter((slot) => session.captures[slot]).length;
   const nextSlot = findNextUncapturedSlot(session.captures, activeSlots);
-  const nextSlotGroup = nextSlot ? getItemSlotGroup(nextSlot) : null;
+  const activeSlot = selectedSlot && activeSlots.includes(selectedSlot) ? selectedSlot : nextSlot;
+  const nextSlotGroup = activeSlot ? getItemSlotGroup(activeSlot) : null;
 
   appElement.innerHTML = `
     <main>
@@ -189,8 +192,8 @@ function render(): void {
                 .map((slot) => {
                   const slotIndex = activeSlots.indexOf(slot);
                   return `
-                <button class="slot ${session.captures[slot] ? 'done' : ''} ${nextSlot === slot ? 'next' : ''}" data-slot="${slot}">
-                  <span>${session.captures[slot] ? '✓' : slotIndex + 1}</span>
+                <button class="slot ${session.captures[slot] ? 'done' : ''} ${activeSlot === slot ? 'next' : ''} ${selectedSlot === slot ? 'selected' : ''} ${capturingSlot === slot ? 'capturing' : ''}" data-slot="${slot}" aria-pressed="${selectedSlot === slot}" ${capturingSlot ? 'disabled' : ''}>
+                  <span>${capturingSlot === slot ? '<i class="spinner" aria-hidden="true"></i>' : session.captures[slot] ? '✓' : slotIndex + 1}</span>
                   <strong>${slotLabel(slot, config.characterClass)}</strong>
                 </button>`;
                 })
@@ -206,7 +209,7 @@ function render(): void {
       </section>
 
       <footer>
-        <span>Shortcut: ${escapeHtml(config.shortcut)} captures the next incomplete slot.</span>
+        <span>Shortcut: ${escapeHtml(config.shortcut)} captures the selected slot, or the next incomplete slot.</span>
         <span>v${escapeHtml(version)}</span>
       </footer>
 
@@ -245,7 +248,7 @@ function render(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-slot]').forEach((button) => {
     button.addEventListener('click', () => {
-      void window.diabloCapture.capture(button.dataset.slot as ItemSlot);
+      void window.diabloCapture.selectSlot(button.dataset.slot as ItemSlot);
     });
   });
 
@@ -342,6 +345,8 @@ window.diabloCapture.onStateChanged((state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  selectedSlot = state.selectedSlot;
+  capturingSlot = state.capturingSlot;
   render();
 });
 
@@ -349,5 +354,7 @@ void window.diabloCapture.getState().then((state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  selectedSlot = state.selectedSlot;
+  capturingSlot = state.capturingSlot;
   render();
 });
