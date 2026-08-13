@@ -14,6 +14,7 @@ export interface DiabloCaptureApi {
   getTempDirectory(): Promise<string>;
   openTempDirectory(): Promise<void>;
   clearTempDirectory(): Promise<void>;
+  getScreenshotPreview(slot: ItemSlot): Promise<string | null>;
   onStateChanged(callback: (state: AppState) => void): void;
 }
 
@@ -30,6 +31,7 @@ contextBridge.exposeInMainWorld('diabloCapture', {
   getTempDirectory: () => ipcRenderer.invoke('temp-directory:get'),
   openTempDirectory: () => ipcRenderer.invoke('temp-directory:open'),
   clearTempDirectory: () => ipcRenderer.invoke('temp-directory:clear'),
+  getScreenshotPreview: (slot: ItemSlot) => ipcRenderer.invoke('preview:get', slot),
   onStateChanged: (callback) => {
     ipcRenderer.on('state:changed', (_event, state) => callback(state));
   }

@@ -7,6 +7,7 @@ import {
   Menu,
   shell
 } from 'electron';
+import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -34,6 +35,7 @@ let config: AppConfig;
 let session: SessionState;
 let selectedSlot: ItemSlot | null = null;
 let capturingSlot: ItemSlot | null = null;
+let shutdownTimer: NodeJS.Timeout | null = null;
 
 function newSession(): SessionState {
   return {
@@ -137,6 +139,10 @@ async function createWindow(): Promise<void> {
 
   mainWindow = window;
 
+  window.once('closed', () => {
+    if (mainWindow === window) mainWindow = null;
+  });
+
   window.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`Preload failed: ${preloadPath}`, error);
   });
@@ -147,17 +153,29 @@ async function createWindow(): Promise<void> {
   await window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 }
 
-app.whenReady().then(async () => {
-  Menu.setApplicationMenu(null);
-  await createWindow();
-  registerShortcut();
+app.whenReady()
+  .then(async () => {
+    Menu.setApplicationMenu(null);
+    await createWindow();
+    registerShortcut();
 
-  app.on('activate', async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    app.on('activate', async () => {
+      if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    });
+  })
+  .catch((error: unknown) => {
+    console.error('Application startup failed.', error);
+    app.exit(1);
   });
+
+app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
+  shutdownTimer ??= setTimeout(() => app.exit(0), 2_000);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -248,4 +266,16 @@ ipcMain.handle('temp-directory:clear', async () => {
   session = newSession();
   selectedSlot = null;
   await emitState();
+});
+
+ipcMain.handle('preview:get', async (_event, slot: ItemSlot) => {
+  if (!session.captures[slot]) return null;
+
+  try {
+    const filePath = session.captures[slot].filePath;
+    const data = await fs.readFile(filePath);
+    return Buffer.from(data).toString('base64');
+  } catch {
+    return null;
+  }
 });

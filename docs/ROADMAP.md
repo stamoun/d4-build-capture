@@ -18,7 +18,7 @@
 - [x] Fix packaged Windows build
 - [x] Validate screenshot capture from the packaged application
 - [x] Fix UI and Markdown text encoding
-- [ ] In-app preview
+- [x] In-app preview
 - [ ] Revisit the application UI and native menu strategy
 
 ## 0.2 Guided Capture

@@ -211,6 +211,60 @@ button:hover { border-color: #77644d; }
   margin: 20px 0;
 }
 
+.screenshot-preview {
+  padding: 0;
+  margin: 20px 0;
+  overflow: hidden;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #29272a;
+}
+
+.preview-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.preview-zoom-level {
+  color: #746f68;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.preview-container {
+  position: relative;
+  overflow: auto;
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+
+.preview-container:active {
+  cursor: grabbing;
+}
+
+.preview-stage {
+  position: relative;
+}
+
+.preview-image {
+  position: absolute;
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .slot-section {
   padding: 0;
   border-radius: 0;

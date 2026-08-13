@@ -77,6 +77,89 @@ function getAppElement(): HTMLDivElement {
 }
 
 const appElement = getAppElement();
+
+const MAX_PREVIEW_ZOOM = 4;
+
+function setPreviewZoom(newScale: number): void {
+  previewScale = Math.min(Math.max(newScale, 1), MAX_PREVIEW_ZOOM);
+}
+
+function applyPreviewZoom(container: HTMLElement, focusX?: number, focusY?: number): void {
+  const stage = container.querySelector<HTMLElement>('.preview-stage');
+  const image = container.querySelector<HTMLImageElement>('#previewImage');
+  const zoomLevel = document.querySelector<HTMLElement>('.preview-zoom-level');
+  if (!stage || !image || image.naturalWidth === 0 || image.naturalHeight === 0) return;
+
+  const oldWidth = image.clientWidth;
+  const oldHeight = image.clientHeight;
+  const availableWidth = container.clientWidth;
+  const availableHeight = Math.min(600, window.innerHeight * 0.65);
+  const fitScale = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight, 1);
+  const width = Math.round(image.naturalWidth * fitScale * previewScale);
+  const height = Math.round(image.naturalHeight * fitScale * previewScale);
+  const viewportHeight = Math.round(image.naturalHeight * fitScale);
+  const anchorX = focusX ?? container.clientWidth / 2;
+  const anchorY = focusY ?? container.clientHeight / 2;
+  const imageX = oldWidth > 0 ? (container.scrollLeft + anchorX) / oldWidth : 0.5;
+  const imageY = oldHeight > 0 ? (container.scrollTop + anchorY) / oldHeight : 0.5;
+
+  container.style.height = `${viewportHeight}px`;
+  stage.style.width = `${Math.max(width, availableWidth)}px`;
+  stage.style.height = `${Math.max(height, viewportHeight)}px`;
+  image.style.width = `${width}px`;
+  image.style.height = `${height}px`;
+  image.style.left = `${Math.max(0, (availableWidth - width) / 2)}px`;
+  image.style.top = `${Math.max(0, (viewportHeight - height) / 2)}px`;
+  container.scrollLeft = imageX * width - anchorX;
+  container.scrollTop = imageY * height - anchorY;
+  if (zoomLevel) zoomLevel.textContent = `${Math.round(previewScale * 100)}%`;
+}
+
+function handlePreviewWheel(event: WheelEvent): void {
+  const container = event.currentTarget as HTMLElement;
+  if (!event.ctrlKey) return;
+
+  event.preventDefault();
+  const rect = container.getBoundingClientRect();
+  setPreviewZoom(previewScale * (event.deltaY > 0 ? 0.9 : 1.1));
+  applyPreviewZoom(container, event.clientX - rect.left, event.clientY - rect.top);
+}
+
+function handlePreviewMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return; // Only left mouse button
+
+  const container = event.currentTarget as HTMLElement;
+  isDraggingPreview = true;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  dragOffsetX = container.scrollLeft;
+  dragOffsetY = container.scrollTop;
+
+  container.style.cursor = 'grabbing';
+  container.style.userSelect = 'none';
+
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    if (!isDraggingPreview) return;
+    moveEvent.preventDefault();
+
+    const dx = moveEvent.clientX - dragStartX;
+    const dy = moveEvent.clientY - dragStartY;
+
+    container.scrollLeft = dragOffsetX - dx;
+    container.scrollTop = dragOffsetY - dy;
+  };
+
+  const handleMouseUp = () => {
+    isDraggingPreview = false;
+    container.style.cursor = '';
+    container.style.userSelect = '';
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+}
 let config: AppConfig;
 let session: SessionState;
 let version: string;
@@ -84,6 +167,13 @@ let tempDirectory: string;
 let selectedSlot: ItemSlot | null;
 let capturingSlot: ItemSlot | null;
 let buildDetailsOpen = false;
+let screenshotPreview: string | null = null;
+let previewScale = 1;
+let isDraggingPreview = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 function inputValue(id: string): string {
   return document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value ?? '';
@@ -109,6 +199,16 @@ async function saveBuildDetails(): Promise<boolean> {
   const buildLink = document.querySelector<HTMLButtonElement>('#openBuildUrl');
   if (buildLink) buildLink.disabled = !details.buildUrl;
   return true;
+}
+
+function initializePreviewIfNeeded(): void {
+  if (!screenshotPreview || !selectedSlot) return;
+  const previewImage = document.querySelector('#previewImage') as HTMLImageElement | null;
+  const previewContainer = document.querySelector<HTMLElement>('#previewContainer');
+  if (!previewImage || !previewContainer) return;
+  const initialize = () => applyPreviewZoom(previewContainer);
+  if (previewImage.complete) initialize();
+  else previewImage.addEventListener('load', initialize, { once: true });
 }
 
 function render(): void {
@@ -188,6 +288,26 @@ function render(): void {
         </section>
       </details>
 
+      ${screenshotPreview && selectedSlot ? `
+      <section class="panel screenshot-preview">
+        <div class="preview-header">
+          <div class="preview-title">
+            <strong>Preview: ${escapeHtml(slotLabel(selectedSlot, config.characterClass))}</strong>
+            <span class="preview-zoom-level">${Math.round(previewScale * 100)}%</span>
+          </div>
+          <div class="preview-actions">
+            <button id="zoomInPreview" class="icon-button" aria-label="Zoom in" title="Zoom In (Ctrl+Scroll)">+</button>
+            <button id="zoomOutPreview" class="icon-button" aria-label="Zoom out" title="Zoom Out (Ctrl+Scroll)">−</button>
+            <button id="resetPreviewZoom" class="icon-button" aria-label="Reset zoom" title="Reset Zoom">↻</button>
+            <button id="closePreview" class="icon-button" aria-label="Close preview" title="Close Preview">×</button>
+          </div>
+        </div>
+        <div class="preview-container" id="previewContainer">
+          <div class="preview-stage"><img src="data:image/png;base64,${escapeHtml(screenshotPreview)}" alt="Screenshot preview for ${escapeHtml(slotLabel(selectedSlot, config.characterClass))}" class="preview-image" id="previewImage" /></div>
+        </div>
+      </section>
+      ` : ''}
+
       <section class="slot-accordion">
         ${SLOT_GROUPS.map(({ id, title }) => {
           const groupSlots = activeSlots.filter((slot) => getItemSlotGroup(slot) === id);
@@ -254,6 +374,33 @@ function render(): void {
       void window.diabloCapture.selectSlot(button.dataset.slot as ItemSlot);
     });
   });
+
+  document.querySelector('#closePreview')?.addEventListener('click', () => {
+    screenshotPreview = null;
+    previewScale = 1;
+    render();
+  });
+
+  document.querySelector('#zoomInPreview')?.addEventListener('click', () => {
+    setPreviewZoom(previewScale * 1.25);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  document.querySelector('#zoomOutPreview')?.addEventListener('click', () => {
+    setPreviewZoom(previewScale / 1.25);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  document.querySelector('#resetPreviewZoom')?.addEventListener('click', () => {
+    setPreviewZoom(1);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  const previewContainer = document.querySelector<HTMLElement>('#previewContainer');
+  if (previewContainer) {
+    previewContainer.addEventListener('wheel', handlePreviewWheel as EventListener, { passive: false });
+    previewContainer.addEventListener('mousedown', handlePreviewMouseDown as EventListener);
+  }
 
   document.querySelector<HTMLDetailsElement>('#buildDetails')?.addEventListener('toggle', (event) => {
     buildDetailsOpen = (event.currentTarget as HTMLDetailsElement).open;
@@ -338,24 +485,43 @@ function render(): void {
       })
       .then(() => settingsDialog?.close());
   });
+
+  initializePreviewIfNeeded();
 }
 
-window.diabloCapture.onStateChanged((state) => {
+async function loadPreviewIfNeeded(): Promise<void> {
+  if (!selectedSlot || !session.captures[selectedSlot]) {
+    screenshotPreview = null;
+    return;
+  }
+
+  try {
+    screenshotPreview = await window.diabloCapture.getScreenshotPreview(selectedSlot);
+    // Reset zoom/pan when loading a new preview
+    previewScale = 1;
+  } catch {
+    screenshotPreview = null;
+  }
+}
+
+window.diabloCapture.onStateChanged(async (state) => {
   config = state.config;
   session = state.session;
   version = state.version;
   tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
+  await loadPreviewIfNeeded();
   render();
 });
 
-void window.diabloCapture.getState().then((state) => {
+void window.diabloCapture.getState().then(async (state) => {
   config = state.config;
   session = state.session;
   version = state.version;
   tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
+  await loadPreviewIfNeeded();
   render();
 });
