@@ -1,15 +1,26 @@
 # Diablo Build Capture
 
-A small local Electron tool for capturing Diablo IV build tooltips and generating
-a portable Markdown + PNG build snapshot.
+A local Windows tool for capturing Diablo IV tooltips and exporting portable
+Markdown, JSON, and PNG build snapshots.
+
+![Diablo Build Capture application](assets/app-preview.png)
+
+## Features
+
+- Sequential capture workflow with one configurable global shortcut.
+- Class-specific equipment, talisman, and character-stat slots.
+- In-app screenshot preview with zooming, scrollbars, and drag panning.
+- Portable Markdown and JSON exports with the captured PNG files.
+- Build planner links and configurable export directories.
+- Fully local operation with no telemetry or runtime network dependency.
 
 ## Getting Started
 
 Prerequisites:
 
-- Node.js 22+
-- npm
 - Windows 11
+- Node.js 24
+- npm
 - Diablo IV in borderless windowed mode (recommended)
 
 ```bash
@@ -17,56 +28,67 @@ npm install
 npm start
 ```
 
+Electron Forge uses `npm start` for the development build.
+
 ## Usage
 
-1. Select an output directory.
-2. Choose a class, enter a build name, and optionally paste a planner URL.
-3. Open Settings to configure the capture region or keyboard shortcut.
-4. Hover over an item in Diablo IV.
-5. Press Ctrl+Shift+Space to capture the next slot, or use a slot button to retake it.
-6. Click **Generate Build**.
+1. Expand **Build Details** and choose the character class, build name, optional
+   planner URL, and output directory.
+2. Hover the next tooltip in Diablo IV.
+3. Press `Ctrl+Shift+Space` to capture it.
+4. Select a specific slot before using the shortcut when replacing an existing
+   capture or capturing out of sequence.
+5. Review captured images in the preview and repeat until the snapshot is ready.
+6. Click **Export** to generate the snapshot and clear the temporary captures.
 
-## Default Shortcut
+The application advances through armor, jewelry, weapons, talismans, and
+character stats according to the selected class.
 
-| Shortcut | Action |
-|---|---|
-| ctrl-shift-space | Capture the next incomplete slot |
+## Settings
 
-## MVP Limitations
+Open the gear menu to:
 
-- The capture region defaults to the primary display and can be configured manually.
-- No OCR.
-- No overlay in Diablo IV.
-- No automated game controls.
-- Character stats are shown as a four-capture overview in the generated Markdown.
+- change the global capture shortcut;
+- inspect the temporary screenshot directory;
+- open or clear temporary captures manually.
 
-## Suggested Next Issues
+## Export Format
 
-1. Add a visual region selector.
-2. Preview the latest capture.
-3. Add explicit multi-monitor support.
-4. Add a guided capture mode.
-5. Add OCR as an optional process.
-6. Compare two snapshots.
-7. Automatically detect black tooltip margins.
+Each export creates a timestamped build directory containing:
+
+- `build.md` for Markdown tools and analysis;
+- `build.json` for structured processing;
+- `items/` with the captured PNG files.
+
+## Development
+
+```bash
+npm run typecheck
+npm test
+npm run package
+npm run make
+```
+
+- `package` creates the unpacked Electron application.
+- `make` creates the Windows installer and other configured distributables.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for planned work.
+
+## Project Constraints
+
+- No game automation.
+- No process-memory reading.
+- No code injection or in-process overlay.
+- No OCR yet.
+- Captures and exported data remain local.
 
 ## Security
 
-The renderer has no direct Node access. Every system operation goes through a
-limited preload and explicit IPC handlers.
+The renderer has no direct Node.js access. Every system operation goes through a
+limited preload API and explicit IPC handlers, with `contextIsolation` enabled.
 
-## Draft Releases
+## Releases
 
-Run the **Build Windows release** workflow manually from GitHub Actions and provide
-a release tag such as `v0.1.0`. The workflow validates the project, builds the
-Windows installer, and creates a draft GitHub release with generated release notes
-and the installer attached. Review and publish the draft from the Releases page.
-
-## Suggested First Codex Prompt
-
-```text
-Read AGENTS.md, README.md, and docs/ROADMAP.md.
-Install the dependencies, run the typecheck, then fix only the errors that
-prevent the MVP from starting. Preserve the secure Electron architecture and
-do not add any game automation.
-```
+Run the **Build Windows release** workflow manually from GitHub Actions and
+provide a release tag such as `v0.1.4`. The workflow validates the project,
+builds the Windows installer, and creates a draft GitHub release for review.
