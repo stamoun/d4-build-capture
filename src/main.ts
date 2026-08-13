@@ -14,6 +14,7 @@ import started from 'electron-squirrel-startup';
 import { captureFullScreen } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
+import { isPathInside } from './paths';
 import { canStartCapture, canStartExport, findCaptureSlot, findFollowingSlot } from './session';
 import { toElectronAccelerator } from './shortcut';
 import {
@@ -213,6 +214,13 @@ ipcMain.handle('build-details:save', async (_event, details: BuildDetails) => {
 ipcMain.handle('directory:choose', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return null;
+  if (isPathInside(tempRootDirectory(), result.filePaths[0])) {
+    dialog.showErrorBox(
+      'Invalid Output Directory',
+      'Choose an output directory outside the temporary screenshot directory.'
+    );
+    return null;
+  }
   config.outputDirectory = result.filePaths[0];
   config = await saveConfig(config);
   await emitState();
@@ -246,6 +254,11 @@ ipcMain.handle('capture:retake-all', async () => {
 ipcMain.handle('export:session', async () => {
   if (!canStartExport(capturingSlot, isExporting)) {
     throw new Error('Wait for the current capture or export to finish.');
+  }
+  if (isPathInside(tempRootDirectory(), config.outputDirectory)) {
+    const message = 'Choose an output directory outside the temporary screenshot directory.';
+    dialog.showErrorBox('Invalid Output Directory', message);
+    throw new Error(message);
   }
 
   isExporting = true;

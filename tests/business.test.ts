@@ -6,6 +6,7 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { findDisplaySource } from '../src/capture';
 import { exportSession } from '../src/exporter';
+import { isPathInside } from '../src/paths';
 import {
   canStartCapture,
   canStartExport,
@@ -95,6 +96,16 @@ test('preview responses apply only to the latest selected slot request', () => {
   assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 2, 2), true);
   assert.equal(isCurrentPreviewRequest('helmet', 'chest', 2, 2), false);
   assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 1, 2), false);
+});
+
+test('output directories cannot use the temporary capture tree', () => {
+  const driveRoot = path.parse(process.cwd()).root;
+  const temporaryRoot = path.join(driveRoot, 'temp', 'diablo-build-capture');
+
+  assert.equal(isPathInside(temporaryRoot, temporaryRoot), true);
+  assert.equal(isPathInside(temporaryRoot, path.join(temporaryRoot, 'exports')), true);
+  assert.equal(isPathInside(temporaryRoot, path.join(driveRoot, 'temp', 'diablo-build-capture-export')), false);
+  assert.equal(isPathInside(temporaryRoot, path.join(driveRoot, 'builds')), false);
 });
 
 test('findDisplaySource selects the source matching the Electron display id', () => {
