@@ -1,7 +1,7 @@
 {
   "name": "diablo-build-capture",
   "productName": "Diablo Build Capture",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Capture Diablo IV item tooltips and export portable build snapshots.",
   "author": "D4BC Contributors",
   "main": ".webpack/main",
