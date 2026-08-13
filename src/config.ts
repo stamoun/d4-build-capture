@@ -2,7 +2,7 @@ import { app } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { CHARACTER_CLASSES, type AppConfig, type CaptureRegion } from './types';
+import { CHARACTER_CLASSES, type AppConfig } from './types';
 import { normalizeShortcutLabel } from './shortcut';
 
 const configSchema = z.object({
@@ -10,13 +10,6 @@ const configSchema = z.object({
   characterClass: z.enum(CHARACTER_CLASSES).default('Barbarian'),
   buildName: z.string().default('Unnamed Build'),
   buildUrl: z.union([z.literal(''), z.string().url()]).default(''),
-  captureRegion: z.object({
-    x: z.number().int().nonnegative(),
-    y: z.number().int().nonnegative(),
-    width: z.number().int().positive(),
-    height: z.number().int().positive()
-  }),
-  captureFullScreen: z.boolean().default(false),
   shortcut: z.string().trim().min(1).transform(normalizeShortcutLabel).default('ctrl-shift-space')
 });
 
@@ -26,19 +19,15 @@ const legacyConfigSchema = z.object({
   characterClass: z.enum(CHARACTER_CLASSES).default('Barbarian'),
   buildName: z.string().default('Unnamed Build'),
   buildUrl: z.union([z.literal(''), z.string().url()]).optional(),
-  captureRegion: configSchema.shape.captureRegion,
-  captureFullScreen: z.boolean().optional(),
   shortcut: z.string().trim().min(1).optional()
 });
 
-function defaultConfig(fullScreenRegion: CaptureRegion): AppConfig {
+function defaultConfig(): AppConfig {
   return {
     outputDirectory: '',
     characterClass: 'Barbarian',
     buildName: 'Unnamed Build',
     buildUrl: '',
-    captureRegion: fullScreenRegion,
-    captureFullScreen: true,
     shortcut: 'ctrl-shift-space'
   };
 }
@@ -47,7 +36,7 @@ function configPath(): string {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
-export async function loadConfig(fullScreenRegion: CaptureRegion): Promise<AppConfig> {
+export async function loadConfig(): Promise<AppConfig> {
   try {
     const raw = await fs.readFile(configPath(), 'utf8');
     const value: unknown = JSON.parse(raw);
@@ -60,12 +49,10 @@ export async function loadConfig(fullScreenRegion: CaptureRegion): Promise<AppCo
       characterClass: legacy.characterClass,
       buildName: legacy.buildName,
       buildUrl: legacy.buildUrl ?? '',
-      captureRegion: legacy.captureRegion,
-      captureFullScreen: legacy.captureFullScreen ?? false,
       shortcut: normalizeShortcutLabel(legacy.shortcut ?? 'ctrl-shift-space')
     };
   } catch {
-    return defaultConfig(fullScreenRegion);
+    return defaultConfig();
   }
 }
 

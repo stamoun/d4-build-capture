@@ -11,6 +11,11 @@ export interface DiabloCaptureApi {
   selectSlot(slot: ItemSlot): Promise<void>;
   resetSession(): Promise<void>;
   exportSession(): Promise<string>;
+  getTempDirectory(): Promise<string>;
+  openTempDirectory(): Promise<void>;
+  clearTempDirectory(): Promise<void>;
+  getScreenshotPreview(slot: ItemSlot): Promise<string | null>;
+  openProjectUrl(): Promise<void>;
   onStateChanged(callback: (state: AppState) => void): void;
 }
 
@@ -24,6 +29,11 @@ contextBridge.exposeInMainWorld('diabloCapture', {
   selectSlot: (slot: ItemSlot) => ipcRenderer.invoke('capture:select-slot', slot),
   resetSession: () => ipcRenderer.invoke('capture:retake-all'),
   exportSession: () => ipcRenderer.invoke('export:session'),
+  getTempDirectory: () => ipcRenderer.invoke('temp-directory:get'),
+  openTempDirectory: () => ipcRenderer.invoke('temp-directory:open'),
+  clearTempDirectory: () => ipcRenderer.invoke('temp-directory:clear'),
+  getScreenshotPreview: (slot: ItemSlot) => ipcRenderer.invoke('preview:get', slot),
+  openProjectUrl: () => ipcRenderer.invoke('project-url:open'),
   onStateChanged: (callback) => {
     ipcRenderer.on('state:changed', (_event, state) => callback(state));
   }

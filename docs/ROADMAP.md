@@ -2,9 +2,11 @@
 
 ## 0.1 Manual Capture
 
+**Status: Complete**
+
 - [x] Persistent configuration
 - [x] Global shortcuts
-- [x] Fixed-region capture
+- [x] Full-screen capture
 - [x] Slot-to-image association
 - [x] Individual image export
 - [x] Character stats overview in Markdown
@@ -15,17 +17,11 @@
 - [x] Four-part stats capture
 - [x] Class selector
 - [x] Configurable shortcut
-- [x] Full-screen capture mode
-- [ ] Fix packaged Windows build
-- [ ] Validate screenshot capture from the packaged application
-- [ ] Fix UI and Markdown text encoding
-- [ ] Validate IPC payloads at runtime
-- [ ] Validate capture regions against display bounds
-- [ ] In-app preview
-- [ ] Define and enforce the incomplete-export policy
-- [ ] Validate the complete workflow at two resolutions
-- [ ] Validate the complete workflow with multiple monitors
-- [ ] Revisit the application UI and native menu strategy
+- [x] Fix packaged Windows build
+- [x] Validate screenshot capture from the packaged application
+- [x] Fix UI and Markdown text encoding
+- [x] In-app preview
+- [x] Revisit the application UI and native menu strategy
 
 ## 0.2 Guided Capture
 
@@ -34,7 +30,6 @@
 - [ ] Talisman data capture
 - [ ] Skill tree capture
 - [ ] Paragon board capture
-- [ ] Visual region selector
 - [ ] Countdown before capture
 - [ ] Discreet notification after capture
 - [x] Shortcut reassignment

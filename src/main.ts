@@ -5,16 +5,17 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
-  screen,
   shell
 } from 'electron';
+import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { captureRegion } from './capture';
+import { captureFullScreen } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
-import { findCaptureSlot, findFollowingSlot } from './session';
+import { isPathInside } from './paths';
+import { canStartCapture, canStartExport, findCaptureSlot, findFollowingSlot } from './session';
 import { toElectronAccelerator } from './shortcut';
 import {
   getItemSlots,
@@ -24,6 +25,8 @@ import {
   type ItemSlot,
   type SessionState
 } from './types';
+
+const PROJECT_URL = 'https://github.com/stamoun/d4-build-capture';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -35,6 +38,8 @@ let config: AppConfig;
 let session: SessionState;
 let selectedSlot: ItemSlot | null = null;
 let capturingSlot: ItemSlot | null = null;
+let isExporting = false;
+let shutdownTimer: NodeJS.Timeout | null = null;
 
 function newSession(): SessionState {
   return {
@@ -43,22 +48,22 @@ function newSession(): SessionState {
   };
 }
 
-function tempCaptureDirectory(): string {
-  return path.join(app.getPath('temp'), 'diablo-build-capture', session.id);
+function tempRootDirectory(): string {
+  return path.join(app.getPath('temp'), 'diablo-build-capture');
 }
 
-function fullScreenRegion(): AppConfig['captureRegion'] {
-  const display = screen.getPrimaryDisplay();
-  return {
-    x: 0,
-    y: 0,
-    width: Math.round(display.size.width * display.scaleFactor),
-    height: Math.round(display.size.height * display.scaleFactor)
-  };
+function tempCaptureDirectory(): string {
+  return path.join(tempRootDirectory(), session.id);
+}
+
+async function clearTemporaryCaptures(): Promise<void> {
+  const rootDirectory = tempRootDirectory();
+  await fs.rm(rootDirectory, { recursive: true, force: true });
+  await fs.mkdir(rootDirectory, { recursive: true });
 }
 
 function appState(): AppState {
-  return { config, session, version: app.getVersion(), selectedSlot, capturingSlot };
+  return { config, session, version: app.getVersion(), tempDirectory: tempRootDirectory(), selectedSlot, capturingSlot };
 }
 
 function emitState(): void {
@@ -66,16 +71,15 @@ function emitState(): void {
 }
 
 async function capture(slot: ItemSlot): Promise<void> {
-  if (capturingSlot) return;
+  if (!canStartCapture(capturingSlot, isExporting)) return;
   const isSelectedRetake = selectedSlot === slot;
   capturingSlot = slot;
   emitState();
 
   try {
-    const outputPath = await captureRegion(
+    const outputPath = await captureFullScreen(
       tempCaptureDirectory(),
-      slot,
-      config.captureFullScreen ? fullScreenRegion() : config.captureRegion
+      slot
     );
 
     session.captures[slot] = {
@@ -130,12 +134,14 @@ function registerShortcut(): boolean {
 }
 
 async function createWindow(): Promise<void> {
-  config = await loadConfig(fullScreenRegion());
+  config = await loadConfig();
   session = newSession();
 
   const window = new BrowserWindow({
-    width: 906,
-    height: 844,
+    width: 960,
+    height: 860,
+    minWidth: 720,
+    minHeight: 760,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -144,6 +150,10 @@ async function createWindow(): Promise<void> {
   });
 
   mainWindow = window;
+
+  window.once('closed', () => {
+    if (mainWindow === window) mainWindow = null;
+  });
 
   window.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error(`Preload failed: ${preloadPath}`, error);
@@ -155,17 +165,29 @@ async function createWindow(): Promise<void> {
   await window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 }
 
-app.whenReady().then(async () => {
-  Menu.setApplicationMenu(null);
-  await createWindow();
-  registerShortcut();
+app.whenReady()
+  .then(async () => {
+    Menu.setApplicationMenu(null);
+    await createWindow();
+    registerShortcut();
 
-  app.on('activate', async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    app.on('activate', async () => {
+      if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    });
+  })
+  .catch((error: unknown) => {
+    console.error('Application startup failed.', error);
+    app.exit(1);
   });
+
+app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
+  shutdownTimer ??= setTimeout(() => app.exit(0), 2_000);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -176,10 +198,7 @@ ipcMain.handle('state:get', async () => appState());
 ipcMain.handle('config:save', async (_event, nextConfig: AppConfig) => {
   const previousConfig = config;
   if (nextConfig.characterClass !== config.characterClass) selectedSlot = null;
-  config = await saveConfig({
-    ...nextConfig,
-    captureRegion: nextConfig.captureFullScreen ? fullScreenRegion() : nextConfig.captureRegion
-  });
+  config = await saveConfig(nextConfig);
   if (!registerShortcut()) {
     config = await saveConfig(previousConfig);
     registerShortcut();
@@ -195,6 +214,13 @@ ipcMain.handle('build-details:save', async (_event, details: BuildDetails) => {
 ipcMain.handle('directory:choose', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return null;
+  if (isPathInside(tempRootDirectory(), result.filePaths[0])) {
+    dialog.showErrorBox(
+      'Invalid Output Directory',
+      'Choose an output directory outside the temporary screenshot directory.'
+    );
+    return null;
+  }
   config.outputDirectory = result.filePaths[0];
   config = await saveConfig(config);
   await emitState();
@@ -226,7 +252,58 @@ ipcMain.handle('capture:retake-all', async () => {
 });
 
 ipcMain.handle('export:session', async () => {
-  const outputDirectory = await exportSession(config, session);
-  await shell.openPath(outputDirectory);
-  return outputDirectory;
+  if (!canStartExport(capturingSlot, isExporting)) {
+    throw new Error('Wait for the current capture or export to finish.');
+  }
+  if (isPathInside(tempRootDirectory(), config.outputDirectory)) {
+    const message = 'Choose an output directory outside the temporary screenshot directory.';
+    dialog.showErrorBox('Invalid Output Directory', message);
+    throw new Error(message);
+  }
+
+  isExporting = true;
+  try {
+    const outputDirectory = await exportSession(config, session);
+    await clearTemporaryCaptures();
+    session = newSession();
+    selectedSlot = null;
+    await emitState();
+    const error = await shell.openPath(outputDirectory);
+    if (error) throw new Error(error);
+    return outputDirectory;
+  } finally {
+    isExporting = false;
+  }
 });
+
+ipcMain.handle('temp-directory:get', async () => {
+  return tempRootDirectory();
+});
+
+ipcMain.handle('temp-directory:open', async () => {
+  const tempDir = tempRootDirectory();
+  await fs.mkdir(tempDir, { recursive: true });
+  const error = await shell.openPath(tempDir);
+  if (error) throw new Error(error);
+});
+
+ipcMain.handle('temp-directory:clear', async () => {
+  await clearTemporaryCaptures();
+  session = newSession();
+  selectedSlot = null;
+  await emitState();
+});
+
+ipcMain.handle('preview:get', async (_event, slot: ItemSlot) => {
+  if (!session.captures[slot]) return null;
+
+  try {
+    const filePath = session.captures[slot].filePath;
+    const data = await fs.readFile(filePath);
+    return Buffer.from(data).toString('base64');
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('project-url:open', () => shell.openExternal(PROJECT_URL));

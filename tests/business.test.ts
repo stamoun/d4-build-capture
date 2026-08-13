@@ -6,7 +6,15 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { findDisplaySource } from '../src/capture';
 import { exportSession } from '../src/exporter';
-import { findCaptureSlot, findFollowingSlot, findNextUncapturedSlot } from '../src/session';
+import { isPathInside } from '../src/paths';
+import {
+  canStartCapture,
+  canStartExport,
+  findCaptureSlot,
+  findFollowingSlot,
+  findNextUncapturedSlot,
+  isCurrentPreviewRequest,
+} from '../src/session';
 import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
 import {
   CHARACTER_CLASSES,
@@ -73,6 +81,31 @@ test('findFollowingSlot advances selected retakes and wraps after the last slot'
   assert.equal(findFollowingSlot('chest', slots), 'gloves');
   assert.equal(findFollowingSlot('gloves', slots), 'helmet');
   assert.equal(findFollowingSlot('weapon-1', slots), null);
+});
+
+test('capture and export operations are mutually exclusive', () => {
+  assert.equal(canStartCapture(null, false), true);
+  assert.equal(canStartCapture('helmet', false), false);
+  assert.equal(canStartCapture(null, true), false);
+  assert.equal(canStartExport(null, false), true);
+  assert.equal(canStartExport('helmet', false), false);
+  assert.equal(canStartExport(null, true), false);
+});
+
+test('preview responses apply only to the latest selected slot request', () => {
+  assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 2, 2), true);
+  assert.equal(isCurrentPreviewRequest('helmet', 'chest', 2, 2), false);
+  assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 1, 2), false);
+});
+
+test('output directories cannot use the temporary capture tree', () => {
+  const driveRoot = path.parse(process.cwd()).root;
+  const temporaryRoot = path.join(driveRoot, 'temp', 'diablo-build-capture');
+
+  assert.equal(isPathInside(temporaryRoot, temporaryRoot), true);
+  assert.equal(isPathInside(temporaryRoot, path.join(temporaryRoot, 'exports')), true);
+  assert.equal(isPathInside(temporaryRoot, path.join(driveRoot, 'temp', 'diablo-build-capture-export')), false);
+  assert.equal(isPathInside(temporaryRoot, path.join(driveRoot, 'builds')), false);
 });
 
 test('findDisplaySource selects the source matching the Electron display id', () => {
@@ -171,8 +204,6 @@ test('exportSession writes stats overview and filters inactive class slots', asy
       characterClass: 'Sorcerer',
       buildName: 'Frozen: Orb',
       buildUrl: 'https://example.com/frozen-orb',
-      captureRegion: { x: 0, y: 0, width: 100, height: 150 },
-      captureFullScreen: false,
       shortcut: 'ctrl-shift-space',
     };
     const session: SessionState = {

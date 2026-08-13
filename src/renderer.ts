@@ -1,5 +1,5 @@
 import { buildShortcutLabel } from './shortcut';
-import { findNextUncapturedSlot } from './session';
+import { findNextUncapturedSlot, isCurrentPreviewRequest } from './session';
 import './styles.css';
 import {
   CHARACTER_CLASSES,
@@ -77,12 +77,104 @@ function getAppElement(): HTMLDivElement {
 }
 
 const appElement = getAppElement();
+
+const MAX_PREVIEW_ZOOM = 4;
+
+function setPreviewZoom(newScale: number): void {
+  previewScale = Math.min(Math.max(newScale, 1), MAX_PREVIEW_ZOOM);
+}
+
+function applyPreviewZoom(container: HTMLElement, focusX?: number, focusY?: number): void {
+  const stage = container.querySelector<HTMLElement>('.preview-stage');
+  const image = container.querySelector<HTMLImageElement>('#previewImage');
+  const zoomLevel = document.querySelector<HTMLElement>('.preview-zoom-level');
+  if (!stage || !image || image.naturalWidth === 0 || image.naturalHeight === 0) return;
+
+  const oldWidth = image.clientWidth;
+  const oldHeight = image.clientHeight;
+  const availableWidth = container.clientWidth;
+  const availableHeight = Math.min(600, window.innerHeight * 0.65);
+  const fitScale = Math.min(availableWidth / image.naturalWidth, availableHeight / image.naturalHeight, 1);
+  const width = Math.round(image.naturalWidth * fitScale * previewScale);
+  const height = Math.round(image.naturalHeight * fitScale * previewScale);
+  const viewportHeight = Math.round(image.naturalHeight * fitScale);
+  const anchorX = focusX ?? container.clientWidth / 2;
+  const anchorY = focusY ?? container.clientHeight / 2;
+  const imageX = oldWidth > 0 ? (container.scrollLeft + anchorX) / oldWidth : 0.5;
+  const imageY = oldHeight > 0 ? (container.scrollTop + anchorY) / oldHeight : 0.5;
+
+  container.style.height = `${viewportHeight}px`;
+  stage.style.width = `${Math.max(width, availableWidth)}px`;
+  stage.style.height = `${Math.max(height, viewportHeight)}px`;
+  image.style.width = `${width}px`;
+  image.style.height = `${height}px`;
+  image.style.left = `${Math.max(0, (availableWidth - width) / 2)}px`;
+  image.style.top = `${Math.max(0, (viewportHeight - height) / 2)}px`;
+  container.scrollLeft = imageX * width - anchorX;
+  container.scrollTop = imageY * height - anchorY;
+  if (zoomLevel) zoomLevel.textContent = `${Math.round(previewScale * 100)}%`;
+}
+
+function handlePreviewWheel(event: WheelEvent): void {
+  const container = event.currentTarget as HTMLElement;
+  if (!event.ctrlKey) return;
+
+  event.preventDefault();
+  const rect = container.getBoundingClientRect();
+  setPreviewZoom(previewScale * (event.deltaY > 0 ? 0.9 : 1.1));
+  applyPreviewZoom(container, event.clientX - rect.left, event.clientY - rect.top);
+}
+
+function handlePreviewMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return; // Only left mouse button
+
+  const container = event.currentTarget as HTMLElement;
+  isDraggingPreview = true;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  dragOffsetX = container.scrollLeft;
+  dragOffsetY = container.scrollTop;
+
+  container.style.cursor = 'grabbing';
+  container.style.userSelect = 'none';
+
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    if (!isDraggingPreview) return;
+    moveEvent.preventDefault();
+
+    const dx = moveEvent.clientX - dragStartX;
+    const dy = moveEvent.clientY - dragStartY;
+
+    container.scrollLeft = dragOffsetX - dx;
+    container.scrollTop = dragOffsetY - dy;
+  };
+
+  const handleMouseUp = () => {
+    isDraggingPreview = false;
+    container.style.cursor = '';
+    container.style.userSelect = '';
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+}
 let config: AppConfig;
 let session: SessionState;
 let version: string;
+let tempDirectory: string;
 let selectedSlot: ItemSlot | null;
 let capturingSlot: ItemSlot | null;
 let buildDetailsOpen = false;
+let screenshotPreview: string | null = null;
+let previewScale = 1;
+let previewRequestId = 0;
+let isDraggingPreview = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 function inputValue(id: string): string {
   return document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value ?? '';
@@ -110,23 +202,34 @@ async function saveBuildDetails(): Promise<boolean> {
   return true;
 }
 
+function initializePreviewIfNeeded(): void {
+  if (!screenshotPreview || !selectedSlot) return;
+  const previewImage = document.querySelector('#previewImage') as HTMLImageElement | null;
+  const previewContainer = document.querySelector<HTMLElement>('#previewContainer');
+  if (!previewImage || !previewContainer) return;
+  const initialize = () => applyPreviewZoom(previewContainer);
+  if (previewImage.complete) initialize();
+  else previewImage.addEventListener('load', initialize, { once: true });
+}
+
 function render(): void {
   const activeSlots = getItemSlots(config.characterClass);
   const completedCount = activeSlots.filter((slot) => session.captures[slot]).length;
   const nextSlot = findNextUncapturedSlot(session.captures, activeSlots);
   const activeSlot = selectedSlot && activeSlots.includes(selectedSlot) ? selectedSlot : nextSlot;
   const nextSlotGroup = activeSlot ? getItemSlotGroup(activeSlot) : null;
+  const captureGuidance = activeSlot
+    ? `Hover your <strong>${escapeHtml(slotLabel(activeSlot, config.characterClass))}</strong> in Diablo IV, then press <kbd>${escapeHtml(config.shortcut)}</kbd>.`
+    : '<strong>All captures complete.</strong> Review the captured images or export the snapshot.';
 
   appElement.innerHTML = `
     <main>
       <header>
         <div>
           <p class="eyebrow">DIABLO IV</p>
-          <h1>Build Capture</h1>
-          <p>Capture tooltips, then generate a Markdown build snapshot.</p>
+          <h1><a id="openProjectUrl" class="title-link" href="https://github.com/stamoun/d4-build-capture">Build Capture <span>v${escapeHtml(version)}</span></a></h1>
         </div>
         <div class="header-actions">
-          <span class="badge">${completedCount}/${activeSlots.length}</span>
           <button id="openSettings" class="icon-button" aria-label="Open settings" title="Settings">⚙</button>
         </div>
       </header>
@@ -171,11 +274,34 @@ function render(): void {
             Output Directory
             <div class="inline">
               <input id="outputDirectory" value="${escapeHtml(config.outputDirectory)}" readonly />
-              <button id="chooseOutputDirectory">Choose</button>
+              <button id="chooseOutputDirectory" class="icon-button" aria-label="Choose output directory" title="Choose Output Directory">📁</button>
             </div>
           </label>
         </section>
       </details>
+
+      <section class="capture-guidance" aria-live="polite">${captureGuidance}</section>
+
+      <div class="capture-workspace ${screenshotPreview && selectedSlot ? 'has-preview' : ''}">
+      ${screenshotPreview && selectedSlot ? `
+      <section class="panel screenshot-preview">
+        <div class="preview-header">
+          <div class="preview-title">
+            <strong>Preview: ${escapeHtml(slotLabel(selectedSlot, config.characterClass))}</strong>
+            <span class="preview-zoom-level">${Math.round(previewScale * 100)}%</span>
+          </div>
+          <div class="preview-actions">
+            <button id="zoomInPreview" class="icon-button" aria-label="Zoom in" title="Zoom In (Ctrl+Scroll)">+</button>
+            <button id="zoomOutPreview" class="icon-button" aria-label="Zoom out" title="Zoom Out (Ctrl+Scroll)">−</button>
+            <button id="resetPreviewZoom" class="icon-button" aria-label="Reset zoom" title="Reset Zoom">↻</button>
+            <button id="closePreview" class="icon-button" aria-label="Close preview" title="Close Preview">×</button>
+          </div>
+        </div>
+        <div class="preview-container" id="previewContainer">
+          <div class="preview-stage"><img src="data:image/png;base64,${escapeHtml(screenshotPreview)}" alt="Screenshot preview for ${escapeHtml(slotLabel(selectedSlot, config.characterClass))}" class="preview-image" id="previewImage" /></div>
+        </div>
+      </section>
+      ` : ''}
 
       <section class="slot-accordion">
         ${SLOT_GROUPS.map(({ id, title }) => {
@@ -190,11 +316,19 @@ function render(): void {
             <div class="slots">
               ${groupSlots
                 .map((slot) => {
-                  const slotIndex = activeSlots.indexOf(slot);
+                  const slotState = capturingSlot === slot
+                    ? '<i class="spinner" aria-label="Capturing"></i>'
+                    : selectedSlot === slot
+                      ? '<small class="slot-state">SELECTED</small>'
+                      : activeSlot === slot
+                        ? '<small class="slot-state">NEXT</small>'
+                        : session.captures[slot]
+                          ? '<small class="slot-state">CAPTURED</small>'
+                          : '';
                   return `
                 <button class="slot ${session.captures[slot] ? 'done' : ''} ${activeSlot === slot ? 'next' : ''} ${selectedSlot === slot ? 'selected' : ''} ${capturingSlot === slot ? 'capturing' : ''}" data-slot="${slot}" aria-pressed="${selectedSlot === slot}" ${capturingSlot ? 'disabled' : ''}>
-                  <span>${capturingSlot === slot ? '<i class="spinner" aria-hidden="true"></i>' : session.captures[slot] ? '✓' : slotIndex + 1}</span>
                   <strong>${slotLabel(slot, config.characterClass)}</strong>
+                  ${slotState}
                 </button>`;
                 })
                 .join('')}
@@ -202,16 +336,16 @@ function render(): void {
           </details>`;
         }).join('')}
       </section>
+      </div>
 
-      <section class="actions">
-        <button id="resetSession" class="secondary">Clear</button>
-        <button id="exportSession" class="primary">Generate</button>
+      <section class="actions panel">
+        <div class="export-progress">
+          <strong>${completedCount} of ${activeSlots.length} captured</strong>
+          <span>${activeSlots.length - completedCount} remaining</span>
+        </div>
+        <button id="resetSession" class="danger-secondary">Clear</button>
+        <button id="exportSession" class="primary">Export</button>
       </section>
-
-      <footer>
-        <span>Shortcut: ${escapeHtml(config.shortcut)} captures the selected slot, or the next incomplete slot.</span>
-        <span>v${escapeHtml(version)}</span>
-      </footer>
 
       <dialog id="settingsDialog">
         <form method="dialog">
@@ -223,18 +357,21 @@ function render(): void {
             <button value="cancel" class="icon-button" aria-label="Close settings">×</button>
           </div>
           <section class="settings-grid">
-            <label class="wide checkbox-label">
-              <input id="captureFullScreen" type="checkbox" ${config.captureFullScreen ? 'checked' : ''} />
-              Capture full screen
-            </label>
-            <label>Region X<input class="region-input" id="regionX" type="number" min="0" value="${config.captureRegion.x}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Region Y<input class="region-input" id="regionY" type="number" min="0" value="${config.captureRegion.y}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Width<input class="region-input" id="regionWidth" type="number" min="1" value="${config.captureRegion.width}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
-            <label>Height<input class="region-input" id="regionHeight" type="number" min="1" value="${config.captureRegion.height}" ${config.captureFullScreen ? 'disabled' : ''} /></label>
             <label class="wide">
               Capture shortcut
               <input id="shortcut" value="${escapeHtml(config.shortcut)}" placeholder="ctrl-shift-space" readonly />
               <small>Focus the field, then press the new key combination.</small>
+            </label>
+            <label class="wide">
+              Temporary Screenshots
+              <div class="inline">
+                <input id="tempDirectory" value="${escapeHtml(tempDirectory)}" readonly />
+                <span class="icon-buttons">
+                  <button id="openTempDirectory" type="button" class="icon-button" aria-label="Open temporary folder" title="Open Temporary Folder">📁</button>
+                  <button id="clearTempDirectory" type="button" class="icon-button danger-icon" aria-label="Clear temporary screenshots" title="Clear Temporary Screenshots">🗑</button>
+                </span>
+              </div>
+              <small>Captured images are stored here until the session is exported or cleared.</small>
             </label>
           </section>
           <div class="dialog-actions">
@@ -252,6 +389,33 @@ function render(): void {
     });
   });
 
+  document.querySelector('#closePreview')?.addEventListener('click', () => {
+    screenshotPreview = null;
+    previewScale = 1;
+    render();
+  });
+
+  document.querySelector('#zoomInPreview')?.addEventListener('click', () => {
+    setPreviewZoom(previewScale * 1.25);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  document.querySelector('#zoomOutPreview')?.addEventListener('click', () => {
+    setPreviewZoom(previewScale / 1.25);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  document.querySelector('#resetPreviewZoom')?.addEventListener('click', () => {
+    setPreviewZoom(1);
+    if (previewContainer) applyPreviewZoom(previewContainer);
+  });
+
+  const previewContainer = document.querySelector<HTMLElement>('#previewContainer');
+  if (previewContainer) {
+    previewContainer.addEventListener('wheel', handlePreviewWheel as EventListener, { passive: false });
+    previewContainer.addEventListener('mousedown', handlePreviewMouseDown as EventListener);
+  }
+
   document.querySelector<HTMLDetailsElement>('#buildDetails')?.addEventListener('toggle', (event) => {
     buildDetailsOpen = (event.currentTarget as HTMLDetailsElement).open;
   });
@@ -268,8 +432,23 @@ function render(): void {
     void window.diabloCapture.openOutputDirectory();
   });
 
+  document.querySelector('#openProjectUrl')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    void window.diabloCapture.openProjectUrl();
+  });
+
   document.querySelector('#chooseOutputDirectory')?.addEventListener('click', () => {
     void window.diabloCapture.chooseOutputDirectory();
+  });
+
+  document.querySelector('#openTempDirectory')?.addEventListener('click', () => {
+    void window.diabloCapture.openTempDirectory();
+  });
+
+  document.querySelector('#clearTempDirectory')?.addEventListener('click', () => {
+    if (confirm('Clear all temporary screenshots? This cannot be undone.')) {
+      void window.diabloCapture.clearTempDirectory();
+    }
   });
 
   document.querySelector('#characterClass')?.addEventListener('change', () => {
@@ -304,13 +483,6 @@ function render(): void {
   const settingsDialog = document.querySelector<HTMLDialogElement>('#settingsDialog');
   document.querySelector('#openSettings')?.addEventListener('click', () => settingsDialog?.showModal());
 
-  const fullScreenInput = document.querySelector<HTMLInputElement>('#captureFullScreen');
-  fullScreenInput?.addEventListener('change', () => {
-    document.querySelectorAll<HTMLInputElement>('.region-input').forEach((input) => {
-      input.disabled = fullScreenInput.checked;
-    });
-  });
-
   const shortcutInput = document.querySelector<HTMLInputElement>('#shortcut');
   shortcutInput?.addEventListener('keydown', (event) => {
     event.preventDefault();
@@ -328,33 +500,52 @@ function render(): void {
     void window.diabloCapture
       .saveConfig({
         ...config,
-        captureRegion: {
-          x: Number(inputValue('regionX')),
-          y: Number(inputValue('regionY')),
-          width: Number(inputValue('regionWidth')),
-          height: Number(inputValue('regionHeight')),
-        },
-        captureFullScreen: fullScreenInput?.checked ?? false,
         shortcut: inputValue('shortcut'),
       })
       .then(() => settingsDialog?.close());
   });
+
+  initializePreviewIfNeeded();
 }
 
-window.diabloCapture.onStateChanged((state) => {
+async function loadPreviewIfNeeded(): Promise<void> {
+  const requestId = ++previewRequestId;
+  const requestedSlot = selectedSlot;
+  if (!requestedSlot || !session.captures[requestedSlot]) {
+    screenshotPreview = null;
+    return;
+  }
+
+  try {
+    const preview = await window.diabloCapture.getScreenshotPreview(requestedSlot);
+    if (!isCurrentPreviewRequest(requestedSlot, selectedSlot, requestId, previewRequestId)) return;
+    screenshotPreview = preview;
+    // Reset zoom/pan when loading a new preview
+    previewScale = 1;
+  } catch {
+    if (!isCurrentPreviewRequest(requestedSlot, selectedSlot, requestId, previewRequestId)) return;
+    screenshotPreview = null;
+  }
+}
+
+window.diabloCapture.onStateChanged(async (state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
+  await loadPreviewIfNeeded();
   render();
 });
 
-void window.diabloCapture.getState().then((state) => {
+void window.diabloCapture.getState().then(async (state) => {
   config = state.config;
   session = state.session;
   version = state.version;
+  tempDirectory = state.tempDirectory;
   selectedSlot = state.selectedSlot;
   capturingSlot = state.capturingSlot;
+  await loadPreviewIfNeeded();
   render();
 });
