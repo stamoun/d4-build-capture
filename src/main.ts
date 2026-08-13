@@ -14,7 +14,7 @@ import started from 'electron-squirrel-startup';
 import { captureFullScreen } from './capture';
 import { exportSession } from './exporter';
 import { loadConfig, saveConfig } from './config';
-import { findCaptureSlot, findFollowingSlot } from './session';
+import { canStartCapture, canStartExport, findCaptureSlot, findFollowingSlot } from './session';
 import { toElectronAccelerator } from './shortcut';
 import {
   getItemSlots,
@@ -37,6 +37,7 @@ let config: AppConfig;
 let session: SessionState;
 let selectedSlot: ItemSlot | null = null;
 let capturingSlot: ItemSlot | null = null;
+let isExporting = false;
 let shutdownTimer: NodeJS.Timeout | null = null;
 
 function newSession(): SessionState {
@@ -69,7 +70,7 @@ function emitState(): void {
 }
 
 async function capture(slot: ItemSlot): Promise<void> {
-  if (capturingSlot) return;
+  if (!canStartCapture(capturingSlot, isExporting)) return;
   const isSelectedRetake = selectedSlot === slot;
   capturingSlot = slot;
   emitState();
@@ -243,14 +244,23 @@ ipcMain.handle('capture:retake-all', async () => {
 });
 
 ipcMain.handle('export:session', async () => {
-  const outputDirectory = await exportSession(config, session);
-  await clearTemporaryCaptures();
-  session = newSession();
-  selectedSlot = null;
-  await emitState();
-  const error = await shell.openPath(outputDirectory);
-  if (error) throw new Error(error);
-  return outputDirectory;
+  if (!canStartExport(capturingSlot, isExporting)) {
+    throw new Error('Wait for the current capture or export to finish.');
+  }
+
+  isExporting = true;
+  try {
+    const outputDirectory = await exportSession(config, session);
+    await clearTemporaryCaptures();
+    session = newSession();
+    selectedSlot = null;
+    await emitState();
+    const error = await shell.openPath(outputDirectory);
+    if (error) throw new Error(error);
+    return outputDirectory;
+  } finally {
+    isExporting = false;
+  }
 });
 
 ipcMain.handle('temp-directory:get', async () => {

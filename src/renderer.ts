@@ -1,5 +1,5 @@
 import { buildShortcutLabel } from './shortcut';
-import { findNextUncapturedSlot } from './session';
+import { findNextUncapturedSlot, isCurrentPreviewRequest } from './session';
 import './styles.css';
 import {
   CHARACTER_CLASSES,
@@ -169,6 +169,7 @@ let capturingSlot: ItemSlot | null;
 let buildDetailsOpen = false;
 let screenshotPreview: string | null = null;
 let previewScale = 1;
+let previewRequestId = 0;
 let isDraggingPreview = false;
 let dragStartX = 0;
 let dragStartY = 0;
@@ -508,16 +509,21 @@ function render(): void {
 }
 
 async function loadPreviewIfNeeded(): Promise<void> {
-  if (!selectedSlot || !session.captures[selectedSlot]) {
+  const requestId = ++previewRequestId;
+  const requestedSlot = selectedSlot;
+  if (!requestedSlot || !session.captures[requestedSlot]) {
     screenshotPreview = null;
     return;
   }
 
   try {
-    screenshotPreview = await window.diabloCapture.getScreenshotPreview(selectedSlot);
+    const preview = await window.diabloCapture.getScreenshotPreview(requestedSlot);
+    if (!isCurrentPreviewRequest(requestedSlot, selectedSlot, requestId, previewRequestId)) return;
+    screenshotPreview = preview;
     // Reset zoom/pan when loading a new preview
     previewScale = 1;
   } catch {
+    if (!isCurrentPreviewRequest(requestedSlot, selectedSlot, requestId, previewRequestId)) return;
     screenshotPreview = null;
   }
 }

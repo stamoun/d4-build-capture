@@ -6,7 +6,14 @@ import test from 'node:test';
 import sharp from 'sharp';
 import { findDisplaySource } from '../src/capture';
 import { exportSession } from '../src/exporter';
-import { findCaptureSlot, findFollowingSlot, findNextUncapturedSlot } from '../src/session';
+import {
+  canStartCapture,
+  canStartExport,
+  findCaptureSlot,
+  findFollowingSlot,
+  findNextUncapturedSlot,
+  isCurrentPreviewRequest,
+} from '../src/session';
 import { buildShortcutLabel, normalizeShortcutLabel, toElectronAccelerator } from '../src/shortcut';
 import {
   CHARACTER_CLASSES,
@@ -73,6 +80,21 @@ test('findFollowingSlot advances selected retakes and wraps after the last slot'
   assert.equal(findFollowingSlot('chest', slots), 'gloves');
   assert.equal(findFollowingSlot('gloves', slots), 'helmet');
   assert.equal(findFollowingSlot('weapon-1', slots), null);
+});
+
+test('capture and export operations are mutually exclusive', () => {
+  assert.equal(canStartCapture(null, false), true);
+  assert.equal(canStartCapture('helmet', false), false);
+  assert.equal(canStartCapture(null, true), false);
+  assert.equal(canStartExport(null, false), true);
+  assert.equal(canStartExport('helmet', false), false);
+  assert.equal(canStartExport(null, true), false);
+});
+
+test('preview responses apply only to the latest selected slot request', () => {
+  assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 2, 2), true);
+  assert.equal(isCurrentPreviewRequest('helmet', 'chest', 2, 2), false);
+  assert.equal(isCurrentPreviewRequest('helmet', 'helmet', 1, 2), false);
 });
 
 test('findDisplaySource selects the source matching the Electron display id', () => {

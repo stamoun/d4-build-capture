@@ -24,3 +24,26 @@ export function findFollowingSlot(
   if (currentIndex === -1 || slots.length === 0) return null;
   return slots[(currentIndex + 1) % slots.length];
 }
+
+export function canStartCapture(
+  capturingSlot: ItemSlot | null,
+  isExporting: boolean
+): boolean {
+  return capturingSlot === null && !isExporting;
+}
+
+export function canStartExport(
+  capturingSlot: ItemSlot | null,
+  isExporting: boolean
+): boolean {
+  return capturingSlot === null && !isExporting;
+}
+
+export function isCurrentPreviewRequest(
+  requestedSlot: ItemSlot,
+  currentSlot: ItemSlot | null,
+  requestId: number,
+  latestRequestId: number
+): boolean {
+  return requestedSlot === currentSlot && requestId === latestRequestId;
+}
