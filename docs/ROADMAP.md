@@ -2,6 +2,8 @@
 
 ## 0.1 Manual Capture
 
+**Status: Complete**
+
 - [x] Persistent configuration
 - [x] Global shortcuts
 - [x] Full-screen capture
@@ -19,7 +21,7 @@
 - [x] Validate screenshot capture from the packaged application
 - [x] Fix UI and Markdown text encoding
 - [x] In-app preview
-- [ ] Revisit the application UI and native menu strategy
+- [x] Revisit the application UI and native menu strategy
 
 ## 0.2 Guided Capture
 
